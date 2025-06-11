@@ -38,6 +38,7 @@ available_client_tools = {
         "calculate_bmi": tools.calculate_bmi,
         "convert_kilograms_to_pounds": tools.convert_kilograms_to_pounds,
         "convert_pounds_to_kilograms": tools.convert_pounds_to_kilograms,
+        "convert_meters_to_feet": tools.convert_meters_to_feet,
         "convert_feet_to_meters": tools.convert_feet_to_meters,
         "is_alphanumeric": tools.is_alphanumeric,
         "url_encode": tools.url_encode,
