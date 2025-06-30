@@ -1,0 +1,13 @@
+[project]
+name = "small-model-experiments-ib"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.11"
+dependencies = [
+    "llama-stack>=0.2.10.1",
+    "llama-stack-client>=0.2.10",
+    "matplotlib>=3.10.3",
+    "numpy>=2.3.0",
+    "pandas>=2.3.0",
+    "python-dotenv>=1.1.0",
+]
