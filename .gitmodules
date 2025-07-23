@@ -1,0 +1,6 @@
+[submodule "tool2vec/libs/my-library"]
+	path = tool2vec/libs/my-library
+	url = https://github.com/EoghanOConnor/Tool2Vec
+[submodule "tool2vec/libs/libraries"]
+	path = tool2vec/libs/libraries
+	url = https://github.com/redhat-et/Tool2Vec
