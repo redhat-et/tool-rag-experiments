@@ -3,7 +3,6 @@ import requests
 from typing import List
 from langchain.docstore.document import Document
 from langchain.embeddings import HuggingFaceEmbeddings
-from langchain.llms import OpenAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 from langchain_community.chat_models import ChatOpenAI
@@ -69,9 +68,11 @@ def connect_to_tool_db(embeddings: HuggingFaceEmbeddings, connection_args: dict)
     )
 
 
-def get_or_index_tools():
+def get_or_index_tools() -> VectorStore:
     embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
     connection_args = {"uri": MILVUS_LITE_DIR} if USE_MILVUS_LITE else {"host": MILVUS_HOST, "port": MILVUS_PORT}
+
+    print("[INFO] Using Milvus Lite" if USE_MILVUS_LITE else "[INFO] Using Milvus server")
 
     if USE_MILVUS_LITE:
         path = os.path.join(MILVUS_LITE_DIR, COLLECTION_NAME)
@@ -100,20 +101,14 @@ def get_or_index_tools():
 
 def construct_prompt(tools: List[Document], user_prompt: str) -> str:
     tool_text = "\n".join([f"{doc.metadata['name']}: {doc.page_content}" for doc in tools])
-    return f"""You are an expert AI assistant.
+    return f"""Please respond to the user request below using the provided list of tool definitions.
 
-The following are relevant tool definitions:
+The following are the tool definitions:
 {tool_text}
 
-Based on the above tools, respond to the following user request:
+This is the user request you have to answer to:
 {user_prompt}
 """
-
-
-def run_llm(augmented_prompt: str) -> str:
-    llm = OpenAI(temperature=0)
-    chain = LLMChain(llm=llm, prompt=PromptTemplate.from_template("{input}"))
-    return chain.run(input=augmented_prompt)
 
 
 def tool_rag_pipeline(user_prompt: str) -> str:
@@ -128,7 +123,6 @@ def tool_rag_pipeline(user_prompt: str) -> str:
 
 if __name__ == "__main__":
     prompt = TEST_PROMPT
-    print("[INFO] Using Milvus Lite" if USE_MILVUS_LITE else "[INFO] Using Milvus server")
     answer = tool_rag_pipeline(prompt)
     print("=== RESPONSE ===")
     print(answer)
