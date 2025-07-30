@@ -6,7 +6,7 @@ import csv
 import types
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph.prebuilt import create_react_agent
-from langchain_ollama import ChatOllama
+from llm_provider import get_llm_provider, validate_provider_setup
 
 from dotenv import load_dotenv
 
@@ -26,6 +26,7 @@ This script tests how well LangChain handles increasing numbers of tools using l
   - Exception Rate (how many exception occurs out of 5 queries)
   - Tool Execution Success Rate (how many time tools are actually executed out of 5 queries)
   - Correct Tool Selection Rate  (how many time correct tool is selected out of 5 queries)
+  - Irrelevant Tool Rate (how many time irrelevant tool is selected out of 5 queries)
   - Average Latency (average time taken to respond 5 queries)
 
 ## Requirements
@@ -61,7 +62,7 @@ def log_results(results):
     """Logs experiment results into a CSV file."""
     with open("experiment_results_langchain_ollama.csv", mode="w", newline="") as file:
         writer = csv.writer(file)
-        writer.writerow(["Tool Count", "Exception Rate", "Tool Execution Rate", "Correct Tool Rate", "Average Latency (s)"])
+        writer.writerow(["Tool Count", "Tool Execution Rate", "Correct Tool Rate", "Irrelevant Tool Rate", "Average Latency (s)"])
         writer.writerows(results)
 
 async def run_main():
@@ -74,10 +75,18 @@ async def run_main():
     })
     tools = await client.get_tools()
     
-    # Initialize the local Ollama model
-    llm = ChatOllama(
-        model="llama3.2:3b-instruct-fp16",
-        base_url=os.getenv("OLLAMA_URL", "http://localhost:11434"),
+    # Validate LLM provider setup
+    provider_status = validate_provider_setup()
+    if not provider_status["available"]:
+        print(f"❌ LLM provider not available: {provider_status['errors']}")
+        return
+    
+    print(f"✅ Using {provider_status['provider']} provider: {provider_status['model']}")
+    
+    # Initialize the LLM using the abstraction layer
+    llm = get_llm_provider(
+        provider=provider_status["provider"],
+        model=provider_status["model"],
         temperature=0,
     )
     
@@ -87,7 +96,6 @@ async def run_main():
     results = []
     total_tools = len(tools)  # Using tools from MCP server
     print(f"\nTesting with {total_tools} tools from MCP server...")
-    exception_count = 0
     tool_execution_count = 0
     correct_tool_count = 0
     total_latency = 0
@@ -144,15 +152,14 @@ async def run_main():
             
         except Exception as e:
             print(f"Error processing query: {e}")
-            exception_count += 1
 
-    exception_rate = exception_count / len(queries)
     tool_execution_rate = tool_execution_count / len(queries)
     correct_tool_rate = correct_tool_count / len(queries)
     average_latency = total_latency / len(queries)
+    irrevant_tool_rate = 1 - correct_tool_rate/tool_execution_rate
     
-    results.append([total_tools, exception_rate, tool_execution_rate, correct_tool_rate, average_latency])
-    print(f"\nTotal Tools: {total_tools}, Exception Rate: {exception_rate:.2%}, Tool Execution Rate: {tool_execution_rate:.2%}, Correct Tool Rate: {correct_tool_rate:.2%}, Avg Latency: {average_latency:.4f}s")
+    results.append([total_tools, tool_execution_rate, correct_tool_rate, average_latency])
+    print(f"\nTotal Tools: {total_tools}, Tool Execution Rate: {tool_execution_rate:.2%}, Correct Tool Rate: {correct_tool_rate:.2%}, Irrelevant Tool Rate: {irrevant_tool_rate:.2%}, Avg Latency: {average_latency:.4f}s")
     
     log_results(results)
 
