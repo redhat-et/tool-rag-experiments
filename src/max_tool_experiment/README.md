@@ -163,19 +163,15 @@ uv add langchain-mcp-adapters langgraph langchain-ollama python-dotenv fastmcp
 
 ### Environment Variables
 
-The experiment uses these environment variables (optional):
+The experiment uses these unified environment variables:
 
-#### For Ollama (Local Testing)
-- `OLLAMA_URL` - Ollama server URL (default: `http://localhost:11434`)
-- `OLLAMA_MODEL` - Model name (default: `llama3.2:3b-instruct-fp16`)
+- `LLM_PROVIDER` - Explicitly set the provider ("ollama", "vllm", "openai")
+- `LLM_MODEL` - Model name/identifier
+- `LLM_BASE_URL` - Base URL for the provider (helps auto-detect remote vs local)
 
-#### For vLLM (Cluster Deployment)
-- `VLLM_BASE_URL` - vLLM server URL (default: `http://localhost:8000/v1`)
-- `VLLM_MODEL` - Model name (default: `meta-llama/Llama-2-7b-chat-hf`)
-
-#### Auto-Detection
-The experiment automatically detects the best available provider:
-1. If `VLLM_BASE_URL` or `VLLM_MODEL` is set → uses vLLM
+#### Auto-Detection Logic
+If `LLM_PROVIDER` is not set, the system automatically detects the best available provider:
+1. If `LLM_BASE_URL` is set → infers remote deployment (vLLM for non-Ollama URLs)
 2. If Ollama is running locally → uses Ollama
 3. Defaults to Ollama for local development
 
@@ -202,27 +198,33 @@ queries = [
 ```
 
 ### Changing the Model
-The experiment uses an LLM provider abstraction that supports both Ollama and vLLM. You can change models by:
+The experiment uses an LLM provider abstraction that automatically detects the best available provider. You can configure it using environment variables:
 
 #### Using Environment Variables (Recommended)
 ```bash
-# For Ollama
-export OLLAMA_MODEL="your-ollama-model"
+# Explicitly set provider
+export LLM_PROVIDER="ollama"
+export LLM_MODEL="your-ollama-model"
 
-# For vLLM
-export VLLM_MODEL="your-vllm-model"
-export VLLM_BASE_URL="http://your-cluster:8000/v1"
+# Or for vLLM
+export LLM_PROVIDER="vllm"
+export LLM_MODEL="your-vllm-model"
+export LLM_BASE_URL="http://your-cluster:8000/v1"
+
+# Or let auto-detection work
+export LLM_MODEL="your-model"
+export LLM_BASE_URL="http://your-cluster:8000/v1"  # Will auto-detect vLLM
 ```
 
 #### Using the LLM Provider API
 ```python
-from llm_provider import get_llm_provider
+from llm_provider import _get_provider
 
-# For local testing
-llm = get_llm_provider("ollama", model="your-model")
+# Provider is automatically determined from environment
+llm = _get_provider()
 
-# For cluster deployment
-llm = get_llm_provider("vllm", model="your-model", base_url="http://cluster:8000/v1")
+# Override temperature if needed
+llm = _get_provider(temperature=0.1)
 ```
 
 ## Architecture
@@ -248,39 +250,39 @@ llm = get_llm_provider("vllm", model="your-model", base_url="http://cluster:8000
 
 ## LLM Provider Abstraction
 
-The experiment uses a flexible LLM provider abstraction (`llm_provider.py`) that supports:
+The experiment uses a flexible LLM provider abstraction (`llm_provider.py`) that automatically detects the best available provider based on environment variables:
 
-### Local Testing (Ollama)
-- **Use case**: Development and testing on local machines
-- **Setup**: Install Ollama and pull models locally
-- **Configuration**: Set `OLLAMA_URL` and `OLLAMA_MODEL` environment variables
+### Supported Providers
+- **Ollama**: For local development and testing
+- **vLLM**: For high-performance serving on clusters
+- **OpenAI**: For cloud API access
 
-### Cluster Deployment (vLLM)
-- **Use case**: Large-scale experiments on compute clusters
-- **Setup**: Connect to existing vLLM deployments
-- **Configuration**: Set `VLLM_BASE_URL` and `VLLM_MODEL` environment variables
+### Environment-Based Configuration
+The provider is automatically determined from environment variables:
+- `LLM_PROVIDER`: Explicitly set the provider ("ollama", "vllm", "openai")
+- `LLM_MODEL`: Model name/identifier
+- `LLM_BASE_URL`: Base URL for the provider (helps auto-detect remote vs local)
 
-### Auto-Detection
-The system automatically detects the best available provider:
-1. **vLLM**: If `VLLM_BASE_URL` or `VLLM_MODEL` environment variables are set
-2. **Ollama**: If Ollama is running locally and accessible
-3. **Fallback**: Defaults to Ollama for local development
+### Auto-Detection Logic
+If `LLM_PROVIDER` is not set, the system automatically detects the best available provider:
+1. If `LLM_BASE_URL` is set → infers remote deployment (vLLM for non-Ollama URLs)
+2. If Ollama is running locally → uses Ollama
+3. Defaults to Ollama for local development
 
 ### Usage Examples
 
 ```python
-from llm_provider import get_llm_provider, get_local_llm, get_cluster_llm
+from llm_provider import _get_provider
 
-# Auto-detect (recommended)
-llm = get_llm_provider()
+# Provider is automatically determined from environment
+llm = _get_provider()
 
-# Explicit provider selection
-llm = get_llm_provider("ollama", model="llama3.2:3b-instruct-fp16")
-llm = get_llm_provider("vllm", model="meta-llama/Llama-2-7b-chat-hf")
+# Override temperature if needed
+llm = _get_provider(temperature=0.1)
 
-# Convenience functions
-llm = get_local_llm()  # For local testing
-llm = get_cluster_llm()  # For cluster deployment
+# Check provider setup
+status = validate_provider_setup()
+print(f"Using {status['provider']} with model {status['model']}")
 ```
 
 ## Contributing

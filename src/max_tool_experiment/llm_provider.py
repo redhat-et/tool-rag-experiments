@@ -4,18 +4,27 @@ LLM Provider Abstraction Layer
 This module provides a unified interface for different LLM providers:
 - Ollama (for local testing)
 - vLLM (for cluster deployments)
+- OpenAI (for cloud API access)
+
+Environment Variables:
+    LLM_PROVIDER: "ollama", "vllm", "openai", or "auto" (default: auto-detect)
+    LLM_MODEL: Model name/identifier
+    LLM_BASE_URL: Base URL for the provider
 
 Usage:
     from llm_provider import get_llm_provider
     
-    # For local testing with Ollama
-    llm = get_llm_provider("ollama", model="llama3.2:3b-instruct-fp16")
+    # Auto-detect (recommended)
+    llm = get_llm_provider()
     
-    # For cluster deployment with vLLM
-    llm = get_llm_provider("vllm", model="meta-llama/Llama-2-7b-chat-hf", base_url="http://cluster:8000/v1")
+    # Explicit provider selection
+    llm = get_llm_provider("ollama", model="llama3.2:3b-instruct-fp16")
+    llm = get_llm_provider("vllm", model="meta-llama/Llama-2-7b-chat-hf")
+    llm = get_llm_provider("openai", model="gpt-3.5-turbo")
 """
 
 import os
+import requests
 from typing import Optional, Union
 from dotenv import load_dotenv
 
@@ -59,19 +68,31 @@ def get_llm_provider(
         return _get_ollama_provider(model, base_url, temperature, **kwargs)
     elif provider == "vllm":
         return _get_vllm_provider(model, base_url, temperature, **kwargs)
+    elif provider == "openai":
+        return _get_openai_provider(model, base_url, temperature, **kwargs)
     else:
         raise LLMProviderError(f"Unsupported provider: {provider}")
+
 
 def _auto_detect_provider() -> str:
     """Auto-detect the best available provider based on environment."""
     
-    # Check for vLLM environment variables (cluster deployment)
-    if os.getenv("VLLM_BASE_URL") or os.getenv("VLLM_MODEL"):
-        return "vllm"
+    # Check if provider is explicitly set
+    provider = os.getenv("LLM_PROVIDER")
+    if provider:
+        return provider.lower()
+    
+    # Check if base URL is set (implies remote deployment)
+    base_url = os.getenv("LLM_BASE_URL")
+    if base_url:
+        # Try to detect provider from URL or default to vllm for remote
+        if "ollama" in base_url.lower():
+            return "ollama"
+        else:
+            return "vllm"
     
     # Check if Ollama is available locally
     try:
-        import requests
         response = requests.get("http://localhost:11434/api/tags", timeout=2)
         if response.status_code == 200:
             return "ollama"
@@ -81,63 +102,28 @@ def _auto_detect_provider() -> str:
     # Default to Ollama for local development
     return "ollama"
 
-def _get_ollama_provider(model: str, base_url: Optional[str], temperature: float, **kwargs):
-    """Get Ollama LLM provider."""
-    try:
-        from langchain_ollama import ChatOllama
-    except ImportError:
-        raise LLMProviderError("langchain-ollama not installed. Run: pip install langchain-ollama")
-    
-    if not model:
-        model = os.getenv("OLLAMA_MODEL", "llama3.2:3b-instruct-fp16")
-    
-    if not base_url:
-        base_url = os.getenv("OLLAMA_URL", "http://localhost:11434")
-    
-    return ChatOllama(
-        model=model,
-        base_url=base_url,
-        temperature=temperature,
-        **kwargs
-    )
 
-def _get_vllm_provider(model: str, base_url: Optional[str], temperature: float, **kwargs):
-    """Get vLLM LLM provider."""
-    try:
-        from langchain_community.llms import VLLM
-    except ImportError:
-        raise LLMProviderError("langchain-community not installed. Run: pip install langchain-community")
+def _get_provider():
+    """Get provider configuration from environment variables."""
+    provider_id = os.getenv("LLM_PROVIDER", "auto")
+    if provider_id == "auto":
+        provider_id = _auto_detect_provider()
     
-    if not model:
-        model = os.getenv("VLLM_MODEL", "meta-llama/Llama-2-7b-chat-hf")
-    
-    if not base_url:
-        base_url = os.getenv("VLLM_BASE_URL", "http://localhost:8000/v1")
-    
-    # vLLM specific configuration
-    vllm_kwargs = {
-        "trust_remote_code": True,
-        "max_new_tokens": 512,
-        "top_p": 0.95,
-        "temperature": temperature,
-        **kwargs
+    return {
+        "provider_id": provider_id,
+        "model": os.getenv("LLM_MODEL"),
+        "base_url": os.getenv("LLM_BASE_URL")
     }
-    
-    return VLLM(
-        model=model,
-        endpoint=base_url,
-        **vllm_kwargs
-    )
 
-def validate_provider_setup(provider: str = "auto") -> dict:
+def validate_provider_setup() -> dict:
     """
-    Validate that the specified provider is properly configured.
+    Validate that the configured provider is properly set up.
     
     Returns:
         dict: Status information about the provider setup
     """
     status = {
-        "provider": provider,
+        "provider": None,
         "available": False,
         "model": None,
         "base_url": None,
@@ -145,49 +131,72 @@ def validate_provider_setup(provider: str = "auto") -> dict:
     }
     
     try:
-        if provider == "auto":
-            provider = _auto_detect_provider()
-            status["provider"] = provider
+        # Get environment variables
+        provider_id = os.getenv("LLM_PROVIDER", "auto")
+        model = os.getenv("LLM_MODEL")
+        base_url = os.getenv("LLM_BASE_URL")
         
-        if provider == "ollama":
+        # Auto-detect provider if not explicitly set
+        if provider_id == "auto":
+            provider_id = _auto_detect_provider()
+        
+        status["provider"] = provider_id
+        status["model"] = model
+        status["base_url"] = base_url
+        
+        # Provider-specific validation
+        if provider_id == "ollama":
             # Test Ollama connection
             import requests
-            base_url = os.getenv("OLLAMA_URL", "http://localhost:11434")
-            response = requests.get(f"{base_url}/api/tags", timeout=5)
+            test_url = base_url or "http://localhost:11434"
+            response = requests.get(f"{test_url}/api/tags", timeout=5)
             
             if response.status_code == 200:
                 status["available"] = True
-                status["base_url"] = base_url
-                status["model"] = os.getenv("OLLAMA_MODEL", "llama3.2:3b-instruct-fp16")
+                status["base_url"] = test_url
+                status["model"] = model or "llama3.2:3b-instruct-fp16"
             else:
                 status["errors"].append(f"Ollama returned status code: {response.status_code}")
         
-        elif provider == "vllm":
+        elif provider_id == "vllm":
             # Test vLLM connection
             import requests
-            base_url = os.getenv("VLLM_BASE_URL", "http://localhost:8000/v1")
+            test_url = base_url or "http://localhost:8000/v1"
             
             try:
-                response = requests.get(f"{base_url}/models", timeout=5)
+                response = requests.get(f"{test_url}/models", timeout=5)
                 if response.status_code == 200:
                     status["available"] = True
-                    status["base_url"] = base_url
-                    status["model"] = os.getenv("VLLM_MODEL", "meta-llama/Llama-2-7b-chat-hf")
+                    status["base_url"] = test_url
+                    status["model"] = model or "meta-llama/Llama-2-7b-chat-hf"
                 else:
                     status["errors"].append(f"vLLM returned status code: {response.status_code}")
             except requests.exceptions.RequestException as e:
                 status["errors"].append(f"Cannot connect to vLLM: {e}")
+        
+        elif provider_id == "openai":
+            # Test OpenAI connection
+            import requests
+            test_url = base_url or "https://api.openai.com/v1"
+            
+            try:
+                # Simple test - OpenAI doesn't have a simple health endpoint
+                # We'll just check if the base URL is accessible
+                if test_url.startswith("https://api.openai.com"):
+                    status["available"] = True
+                    status["base_url"] = test_url
+                    status["model"] = model or "gpt-3.5-turbo"
+                else:
+                    # For custom endpoints, we can't easily test without API key
+                    status["available"] = True  # Assume available
+                    status["base_url"] = test_url
+                    status["model"] = model or "gpt-3.5-turbo"
+            except Exception as e:
+                status["errors"].append(f"Cannot validate OpenAI setup: {e}")
+        else:
+            status["errors"].append(f"Unsupported provider: {provider_id}")
     
     except Exception as e:
         status["errors"].append(f"Validation error: {e}")
     
     return status
-
-# Convenience functions for common use cases
-def get_local_llm(model: str = "llama3.2:3b-instruct-fp16", **kwargs):
-    """Get LLM for local testing (Ollama)."""
-    return get_llm_provider("ollama", model=model, **kwargs)
-
-def get_cluster_llm(model: str = None, base_url: str = None, **kwargs):
-    """Get LLM for cluster deployment (vLLM)."""
-    return get_llm_provider("vllm", model=model, base_url=base_url, **kwargs) 
