@@ -10,4 +10,13 @@ dependencies = [
     "numpy>=2.3.0",
     "pandas>=2.3.0",
     "python-dotenv>=1.1.0",
+    "langchain>=0.3.27",
+    "langchain-openai>=0.3.28",
+    "langchain-community>=0.3.27",
+    "langchain-ollama>=0.3.6",
+    # Max Tool Experiment specific dependencies
+    "langchain-mcp-adapters>=0.1.0",
+    "langgraph>=0.2.0",
+    "fastmcp>=0.1.0",
+    "requests>=2.25.0",
 ]
