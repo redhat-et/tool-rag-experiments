@@ -1,6 +1,7 @@
-# LangChain Max Tool Experiment
+# An Evaluation Engine for Tool Execution Experiments
 
-This experiment tests how well LangChain handles increasing numbers of tools using either vllm or local Ollama models by measuring **tool selection accuracy, execution success, and latency**.
+This framework evaluates advanced agentic solutions for scalable and reliable tool executions. 
+Solutions are evaluated in terms of **tool selection accuracy, execution success, and latency**.
 
 ## Overview
 
