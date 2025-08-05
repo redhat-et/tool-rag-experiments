@@ -3,8 +3,8 @@ from llama_stack.apis.vector_io import QueryChunksResponse
 from typing import Dict, List, Any, Optional, Union
 from llama_stack_client import LlamaStackClient
 from llama_stack_client.lib.agents.agent import Agent
-from src.tools.info import available_client_tools
-from src.tools.metrics import add_metric
+from old_experiments.src.tools.info import available_client_tools
+from old_experiments.src.tools.metrics import add_metric
 
 def get_tool_names(response: QueryChunksResponse) -> list[str]:
     tool_names = {

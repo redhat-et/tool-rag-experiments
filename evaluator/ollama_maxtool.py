@@ -62,7 +62,7 @@ This script tests how well LangChain handles increasing numbers of tools using l
 python src/mcp_tool_server.py
 
 # Then run the experiment in another terminal:
-python src/max_tool_experiment/ollama_maxtool.py
+python src/evaluator/ollama_maxtool.py
 ```
 Results are saved in `experiment_results_langchain_ollama.csv` for analysis.
 
