@@ -4,3 +4,6 @@
 [submodule "tool2vec/libs/libraries"]
 	path = tool2vec/libs/libraries
 	url = https://github.com/redhat-et/Tool2Vec
+[submodule "src/max_tool_experiment/mcp_proxy/external/StableToolBench"]
+	path = src/max_tool_experiment/mcp_proxy/external/StableToolBench
+	url = https://github.com/THUNLP-MT/StableToolBench.git
