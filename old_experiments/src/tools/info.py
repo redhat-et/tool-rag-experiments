@@ -1,4 +1,4 @@
-from src.tools import tools
+from old_experiments.src.tools import tools
 
 available_client_tools = {
         "add_two_numbers": tools.add_two_numbers,

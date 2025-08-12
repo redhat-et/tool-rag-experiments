@@ -1,10 +1,10 @@
 import os
 from llama_stack_client import LlamaStackClient
-from src.tools.info import tool_use_cases
-from src.utils.env import Env
-from src.utils.data_loader import load_queries
-from src.utils.logging_config import setup_logger
-from src.tools.metrics import get_analysis_plots
+from old_experiments.src.tools.info import tool_use_cases
+from old_experiments.src.utils.env import Env
+from old_experiments.src.utils.data_loader import load_queries
+from old_experiments.src.utils.logging_config import setup_logger
+from old_experiments.src.tools.metrics import get_analysis_plots
 import test_runner
 
 def insert_tool_embedding(tool_name, tool_use_case, vector_db_id: str, client: LlamaStackClient):

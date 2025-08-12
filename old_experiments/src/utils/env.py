@@ -1,6 +1,6 @@
 from os import getenv as env, path
 from dotenv import load_dotenv
-from src.utils.singleton import singleton
+from old_experiments.src.utils.singleton import singleton
 
 
 @singleton

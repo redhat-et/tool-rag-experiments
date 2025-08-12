@@ -1,6 +1,7 @@
-# LangChain Max Tool Experiment
+# An Evaluation Engine for Tool Execution Experiments
 
-This experiment tests how well LangChain handles increasing numbers of tools using either vllm or local Ollama models by measuring **tool selection accuracy, execution success, and latency**.
+This framework evaluates advanced agentic solutions for scalable and reliable tool executions. 
+Solutions are evaluated in terms of **tool selection accuracy, execution success, and latency**.
 
 ## Overview
 
@@ -74,7 +75,7 @@ ollama pull llama3.2:3b-instruct-fp16
 
 ### Option 1: Automated Script (Recommended)
 ```bash
-cd src/max_tool_experiment
+cd src/evaluator
 ./run_experiment.sh
 ```
 
@@ -89,13 +90,13 @@ The script will:
 
 #### Terminal 1: Start MCP Server
 ```bash
-cd src/max_tool_experiment
+cd src/evaluator
 python mcp_tool_server.py
 ```
 
 #### Terminal 2: Run Experiment
 ```bash
-cd src/max_tool_experiment
+cd src/evaluator
 python ollama_maxtool.py
 ```
 
