@@ -1,131 +1,146 @@
 #!/bin/bash
 
-# LangChain Max Tool Experiment Runner
-# This script starts the MCP tool server and runs the experiment
+# Enhanced Max Tool Experiment with ToolBench-style evaluation
+# This script runs the enhanced experiment with ToolBench metrics
 
-set -e  # Exit on any error
+set -e
 
-echo "🚀 Starting LangChain Max Tool Experiment..."
-echo "=========================================="
+echo "🚀 Starting Enhanced Max Tool Experiment with ToolBench-style Evaluation"
+echo "=================================================================="
 
-# Check LLM provider availability
-echo "🔍 Checking LLM provider availability..."
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
 
-# Check if provider is explicitly set
-if [ ! -z "$LLM_PROVIDER" ]; then
-    echo "✅ LLM_PROVIDER explicitly set to: $LLM_PROVIDER"
-    
-    # Provider-specific checks
-    case "$LLM_PROVIDER" in
-        "ollama")
-            if curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then
-                echo "✅ Ollama is running"
-                # Check if the required model is available
-                MODEL_NAME="${LLM_MODEL:-llama3.2:3b-instruct-fp16}"
-                if ! ollama list | grep -q "$MODEL_NAME"; then
-                    echo "📥 Pulling required model: $MODEL_NAME"
-                    ollama pull "$MODEL_NAME"
-                fi
-            else
-                echo "❌ Error: Ollama is not running. Please start Ollama with 'ollama serve'"
-                exit 1
-            fi
-            ;;
-        "vllm")
-            BASE_URL="${LLM_BASE_URL:-http://localhost:8000/v1}"
-            if curl -s "$BASE_URL/models" > /dev/null 2>&1; then
-                echo "✅ vLLM server is accessible at $BASE_URL"
-            else
-                echo "❌ Error: vLLM server not accessible at $BASE_URL"
-                exit 1
-            fi
-            ;;
-        "openai")
-            echo "✅ OpenAI provider configured (will use API key from environment)"
-            ;;
-        *)
-            echo "❌ Error: Unsupported LLM_PROVIDER: $LLM_PROVIDER"
-            echo "   Supported providers: ollama, vllm, openai"
-            exit 1
-            ;;
-    esac
-else
-    # Auto-detect provider
-    echo "🔍 Auto-detecting LLM provider..."
-    
-    # Check if base URL is set (implies remote deployment)
-    if [ ! -z "$LLM_BASE_URL" ]; then
-        if [[ "$LLM_BASE_URL" == *"ollama"* ]]; then
-            echo "✅ Auto-detected Ollama from LLM_BASE_URL"
-            if curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then
-                echo "✅ Ollama is running"
-            else
-                echo "❌ Error: Ollama is not running"
-                exit 1
-            fi
-        else
-            echo "✅ Auto-detected vLLM from LLM_BASE_URL"
-            if curl -s "$LLM_BASE_URL/models" > /dev/null 2>&1; then
-                echo "✅ vLLM server is accessible"
-            else
-                echo "❌ Error: vLLM server not accessible"
-                exit 1
-            fi
-        fi
-    else
-        # Check if Ollama is running locally
-        if curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then
-            echo "✅ Auto-detected Ollama (running locally)"
-            # Check if the required model is available
-            MODEL_NAME="${LLM_MODEL:-llama3.2:3b-instruct-fp16}"
-            if ! ollama list | grep -q "$MODEL_NAME"; then
-                echo "📥 Pulling required model: $MODEL_NAME"
-                ollama pull "$MODEL_NAME"
-            fi
-        else
-            echo "❌ Error: No LLM provider available"
-            echo "   Set LLM_PROVIDER environment variable or ensure Ollama is running"
-            exit 1
-        fi
-    fi
+# Function to print colored output
+print_status() {
+    echo -e "${GREEN}✅ $1${NC}"
+}
+
+print_warning() {
+    echo -e "${YELLOW}⚠️  $1${NC}"
+}
+
+print_error() {
+    echo -e "${RED}❌ $1${NC}"
+}
+
+print_info() {
+    echo -e "${BLUE}ℹ️  $1${NC}"
+}
+
+# After set -e and color funcs add arg parsing
+# Check if we're in the right directory
+if [ ! -f "mcp_tool_server.py" ]; then
+    print_error "Please run this script from the src/max_tool_experiment directory"
+    exit 1
 fi
+
+# Check if uv is installed
+if ! command -v uv &> /dev/null; then
+    print_error "uv is not installed. Please install it first:"
+    echo "curl -LsSf https://astral.sh/uv/install.sh | sh"
+    exit 1
+fi
+
+# Check if Ollama is running
+print_info "Checking Ollama service..."
+if ! curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then
+    print_warning "Ollama service is not running. Starting Ollama..."
+    ollama serve &
+    sleep 5
+fi
+
+# Check if required model is available
+print_info "Checking required model..."
+if ! ollama list | grep -q "llama3.2:3b-instruct-fp16"; then
+    print_warning "Required model not found. Pulling llama3.2:3b-instruct-fp16..."
+    ollama pull llama3.2:3b-instruct-fp16
+fi
+
+# Install dependencies
+print_info "Installing dependencies..."
+uv sync
+
+# Prepare Python runner (avoid manual venv activation; use project env)
+print_info "Preparing Python environment..."
+PYTHON_CMD="uv run python"
 
 # Function to cleanup background processes
 cleanup() {
-    echo "🧹 Cleaning up..."
+    print_info "Cleaning up background processes..."
     if [ ! -z "$MCP_PID" ]; then
         kill $MCP_PID 2>/dev/null || true
-        echo "   Stopped MCP server (PID: $MCP_PID)"
+    fi
+    if [ ! -z "$OLLAMA_PID" ]; then
+        kill $OLLAMA_PID 2>/dev/null || true
     fi
     exit 0
 }
 
-# Set up signal handlers
-trap cleanup SIGINT SIGTERM
+# Set trap to cleanup on exit
+trap cleanup EXIT INT TERM
 
-# Start MCP server in background
-echo "🔧 Starting MCP tool server..."
-python mcp_tool_server.py &
+# Start MCP tool server in background
+print_info "Starting MCP tool server..."
+$PYTHON_CMD mcp_tool_server.py &
 MCP_PID=$!
 
-# Wait a moment for the server to start
+# Wait for MCP server to start
+print_info "Waiting for MCP server to start..."
 sleep 3
 
-# Check if MCP server started successfully
-if ! curl -s http://127.0.0.1:8000/mcp/ > /dev/null 2>&1; then
-    echo "❌ Error: MCP server failed to start"
-    cleanup
+# Check if MCP server is running
+if ! curl -s http://localhost:8000/mcp/ > /dev/null 2>&1; then
+    print_error "MCP server failed to start"
     exit 1
 fi
 
-echo "✅ MCP server started successfully (PID: $MCP_PID)"
-echo "🧪 Running experiment..."
+print_status "MCP server is running on http://localhost:8000/mcp/"
 
-# Run the experiment
-python ollama_maxtool.py
+# Run the enhanced experiment
+print_info "Running enhanced experiment with ToolBench-style evaluation..."
+$PYTHON_CMD enhanced_maxtool_experiment.py
 
-echo "✅ Experiment completed!"
-echo "📊 Results saved to: experiment_results_langchain_ollama.csv"
+# Check if experiment completed successfully
+if [ $? -eq 0 ]; then
+    print_status "Enhanced experiment completed successfully!"
+    
+    # Check if results files were created
+    if [ -f "toolbench_agent_evaluation_results.json" ]; then
+        print_status "ToolBench evaluation results saved to toolbench_agent_evaluation_results.json"
+    fi
+    
+    if [ -f "enhanced_experiment_results.json" ]; then
+        print_status "Enhanced experiment results saved to enhanced_experiment_results.json"
+    fi
+    
+    # Display summary if results exist
+    if [ -f "enhanced_experiment_results.json" ]; then
+        print_info "=== Experiment Summary ==="
+        $PYTHON_CMD - <<'PY'
+import json
+report = json.load(open('enhanced_experiment_results.json'))
+m = report.get('agent_metrics', {})
+print("Tool Execution Rate : {:.2%}".format(m.get("tool_execution_rate", 0)))
+print("Correct Tool Rate   : {:.2%}".format(m.get("correct_tool_rate", 0)))
+print("Irrelevant Tool Rate: {:.2%}".format(m.get("irrelevant_tool_rate", 0)))
+print("Average Latency     : {:.2f}s".format(m.get("average_latency", 0)))
+print("ToolBench Pass Rate : {:.2f}%".format(report.get('toolbench_pass_rate_evaluation', {}).get('overall_statistics', {}).get('pass_rate', 0)))
+PY
+    fi
+else
+    print_error "Enhanced experiment failed"
+    exit 1
+fi
 
-# Cleanup
-cleanup 
+print_status "Enhanced experiment completed!"
+print_info "Check the following files for detailed results:"
+echo "   - enhanced_experiment_results.json (Combined Report)" 
+
+# Cleanup and exit
+cleanup
+exit 0 
