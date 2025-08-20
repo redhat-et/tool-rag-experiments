@@ -2,7 +2,10 @@ import asyncio
 import time
 import csv
 from langchain_mcp_adapters.client import MultiServerMCPClient
-from langgraph.prebuilt import create_react_agent
+
+from evaluator.algorithm_factory import create_algorithms
+from evaluator.eval_spec import EVALUATION_SPECIFICATION
+from evaluator.tool_rag_algorithm import ToolRagAlgorithm
 from llm_provider import _get_provider, validate_provider_setup
 from dotenv import load_dotenv
 
@@ -81,17 +84,15 @@ queries = [
     ("Give me an insurance evaluation score", "insurance_scorer")
 ]
 
-def log_results(results):
+def log_results(log_file_name, results):
     """Logs experiment results into a CSV file."""
-    with open("experiment_results_langchain_ollama.csv", mode="w", newline="") as file:
+    with open(log_file_name, mode="w", newline="") as file:
         writer = csv.writer(file)
         writer.writerow(["Tool Count", "Tool Execution Rate", "Correct Tool Rate", "Irrelevant Tool Rate", "Average Latency (s)"])
         writer.writerows(results)
 
+
 async def run_main():
-    # Create tool logger
-    tool_logger = ToolLogger()
-    
     # Connect to the MCP tool server
     client = MultiServerMCPClient({
         "general": {
@@ -100,18 +101,18 @@ async def run_main():
         }
     })
     tools = await client.get_tools()
-    
+
     # Validate LLM provider setup
     provider_status = validate_provider_setup()
     if not provider_status["available"]:
         print(f"❌ LLM provider not available: {provider_status['errors']}")
         return
-    
+
     print(f"✅ Using {provider_status['provider']} provider: {provider_status['model']}")
-    
+
     # Get provider configuration
     provider_config = _get_provider()
-    
+
     # Initialize the LLM based on provider
     if provider_config["provider_id"] == "ollama":
         from langchain_ollama import ChatOllama
@@ -139,9 +140,17 @@ async def run_main():
         )
     else:
         raise Exception(f"Unsupported provider: {provider_config['provider_id']}")
-    
-    # Create the agent using LangGraph
-    agent = create_react_agent(llm, tools)
+
+    algorithms_to_compare = create_algorithms(EVALUATION_SPECIFICATION)
+
+    for i, algo in enumerate(algorithms_to_compare):
+        print(f"Running experiment {i} of {len(algorithms_to_compare)}: {algo.get_unique_id()}")
+        await run_experiment(algo, llm, tools)
+
+
+async def run_experiment(algo: ToolRagAlgorithm, llm, tools):
+    # setting up the algorithm for the experiment
+    algo.set_up(llm, tools)
     
     results = []
     total_tools = len(tools)  # Using tools from MCP server
@@ -151,12 +160,15 @@ async def run_main():
     irrelevant_tool_count = 0
     total_latency = 0
 
+    # Create tool logger
+    tool_logger = ToolLogger()
+
     for query, correct_tool in queries:
         print(f"\nUser: {query}")
         start_time = time.time()
         
         try:
-            response = await agent.ainvoke({"messages": query})
+            response = algo.process_query(query)
             end_time = time.time()
             response_time = end_time - start_time
             total_latency += response_time
@@ -185,6 +197,9 @@ async def run_main():
         except Exception as e:
             print(f"Error processing query: {e}")
 
+    # tearing down the current algorithm
+    algo.tear_down()
+
     tool_execution_rate = tool_execution_count / len(queries)
     correct_tool_rate = correct_tool_count / len(queries)
     average_latency = total_latency / len(queries)
@@ -194,7 +209,7 @@ async def run_main():
     results.append([total_tools, tool_execution_rate, correct_tool_rate, average_latency])
     print(f"\nTotal Tools: {total_tools}, Tool Execution Rate: {tool_execution_rate:.2%}, Correct Tool Rate: {correct_tool_rate:.2%}, Irrelevant Tool Rate: {irrevant_tool_rate:.2%}, Avg Latency: {average_latency:.4f}s")
     
-    log_results(results)
+    log_results(f"results_{algo.get_unique_id()}.csv", results)
 
 if __name__ == "__main__":
     asyncio.run(run_main()) 
