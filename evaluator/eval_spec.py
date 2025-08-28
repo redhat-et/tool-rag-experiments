@@ -1,7 +1,12 @@
 from typing import List
 
-from evaluator.algorithm_factory import Spec
+from evaluator.utils.module_extractor import Spec
 
-EVALUATION_SPECIFICATION: List[Spec] = [
+EVALUATED_ALGORITHMS: List[Spec] = [
     ("no_tool_rag_baseline", {}),
+    #("basic_tool_rag", {"top_k": 3}),
+]
+
+METRIC_COLLECTORS: List[Spec] = [
+    ("basic_metric_collector", {}),
 ]

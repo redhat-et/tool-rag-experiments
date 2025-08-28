@@ -1,20 +1,28 @@
+import os
+
 from mcp.server.fastmcp import FastMCP
 import random
 import functools
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 def log_tool(tool_name):
-    print(f"Logging tool: {tool_name}" )
+    print(f"Logging tool: {tool_name}")
     def decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             # Create file if it doesn't exist
-            with open("tool_log.txt", "a") as f:
+            with open(os.getenv("TOOL_LOG_PATH"), "a") as f:
                 f.write(f"[TOOL] {tool_name}\n")
             return func(*args, **kwargs)
         return wrapper
     return decorator
 
+
 mcp = FastMCP("General")
+
 
 @mcp.tool()
 @log_tool("weather_info")
@@ -46,5 +54,6 @@ def insurance_scorer() -> str:
     """Generates a random insurance score between 1 and 100."""
     return f"Insurance score: {random.randint(1, 100)}"
 
+
 if __name__ == "__main__":
-    mcp.run(transport="streamable-http") 
+    mcp.run(transport="streamable-http")
