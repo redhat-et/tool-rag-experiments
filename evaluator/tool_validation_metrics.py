@@ -119,6 +119,3 @@ class ToolSetMetricsAggregator:
             ])
 
 
-# Alias for backwards compatibility / simpler usage
-validate_tool_execution = compute_tool_set_metrics
-ToolValidationAggregator = ToolSetMetricsAggregator
