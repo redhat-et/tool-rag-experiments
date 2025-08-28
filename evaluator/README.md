@@ -76,7 +76,7 @@ ollama pull llama3.2:3b-instruct-fp16
 ### Option 1: Automated Script (Recommended)
 ```bash
 cd src/evaluator
-./run_experiment.sh
+./run_experiments.sh
 ```
 
 The script will:
@@ -97,7 +97,7 @@ python mcp_tool_server.py
 #### Terminal 2: Run Experiment
 ```bash
 cd src/evaluator
-python ollama_maxtool.py
+python run_experiments.py
 ```
 
 ## Output

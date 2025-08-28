@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Any, ClassVar, List
 
-from langchain_core.language_models import BaseLLM
+from langchain_core.language_models import BaseChatModel
 from langchain_core.tools import BaseTool
 
 
@@ -19,7 +19,7 @@ class ToolRagAlgorithm(ABC):
         return f"{self.get_name()}:{self._settings}"
 
     @abstractmethod
-    def set_up(self, model: BaseLLM, tools: List[BaseTool]) -> None:
+    def set_up(self, model: BaseChatModel, tools: List[BaseTool]) -> None:
         raise NotImplementedError()
 
     @abstractmethod

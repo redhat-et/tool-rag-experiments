@@ -1,16 +1,16 @@
 import os
 from typing import List, Dict
 from langchain.docstore.document import Document
-from langchain.embeddings import HuggingFaceEmbeddings
+from langchain_community.embeddings import HuggingFaceEmbeddings
 
 from langchain_community.vectorstores import Milvus, VectorStore
-from langchain_core.language_models import BaseLLM
+from langchain_core.language_models import BaseChatModel
 from langchain_core.tools import BaseTool
 from langgraph.prebuilt import create_react_agent
 from pymilvus import connections, utility
 
-from evaluator.algorithm_factory import register_tool_rag_algorithm
-from evaluator.tool_rag_algorithm import ToolRagAlgorithm
+from evaluator.utils.module_extractor import register_tool_rag_algorithm
+from evaluator.interfaces.tool_rag_algorithm import ToolRagAlgorithm
 
 from dotenv import load_dotenv
 
@@ -27,7 +27,7 @@ DEFAULT_TOOL_SELECTION_K = 3
 @register_tool_rag_algorithm("basic_tool_rag")
 class BasicToolRagAlgorithm(ToolRagAlgorithm):
 
-    model: BaseLLM or None
+    model: BaseChatModel or None
     vector_store: VectorStore or None
 
     def __init__(self, settings: Dict):
@@ -53,7 +53,7 @@ class BasicToolRagAlgorithm(ToolRagAlgorithm):
     def __get_or_index_tools(tools: List[BaseTool]) -> VectorStore:
         embeddings = HuggingFaceEmbeddings(model_name=os.getenv("EMBEDDING_MODEL_NAME",
                                                                 DEFAULT_EMBEDDING_MODEL_NAME))
-        milvus_uri = os.getenv("MILVUS_URI")
+        milvus_uri = os.getenv("MILVUS_PATH")
 
         connections.connect(alias=MILVUS_CONNECTION_ALIAS, uri=milvus_uri)
         if not OVERRIDE_COLLECTION and utility.has_collection(COLLECTION_NAME):
@@ -74,7 +74,7 @@ class BasicToolRagAlgorithm(ToolRagAlgorithm):
             drop_old=True,
         )
 
-    def set_up(self, model: BaseLLM, tools: List[BaseTool]):
+    def set_up(self, model: BaseChatModel, tools: List[BaseTool]):
         self.model = model
         self.vector_store = self.__get_or_index_tools(tools)
 

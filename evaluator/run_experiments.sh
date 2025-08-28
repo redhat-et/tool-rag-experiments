@@ -1,11 +1,10 @@
 #!/bin/bash
 
-# LangChain Max Tool Experiment Runner
 # This script starts the MCP tool server and runs the experiment
 
 set -e  # Exit on any error
 
-echo "🚀 Starting LangChain Max Tool Experiment..."
+echo "🚀 Starting Tool RAG Experiments..."
 echo "=========================================="
 
 # Check LLM provider availability
@@ -105,7 +104,7 @@ trap cleanup SIGINT SIGTERM
 
 # Start MCP server in background
 echo "🔧 Starting MCP tool server..."
-python mcp_tool_server.py &
+python components/mcp_tool_server.py &
 MCP_PID=$!
 
 # Wait a moment for the server to start
@@ -122,7 +121,7 @@ echo "✅ MCP server started successfully (PID: $MCP_PID)"
 echo "🧪 Running experiment..."
 
 # Run the experiment
-python ollama_maxtool.py
+python run_experiments.py
 
 echo "✅ Experiment completed!"
 echo "📊 Results saved to: experiment_results_langchain_ollama.csv"

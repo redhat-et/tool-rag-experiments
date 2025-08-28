@@ -1,0 +1,105 @@
+import asyncio
+import os
+from pathlib import Path
+from typing import List, Tuple
+
+from langchain_core.language_models import BaseChatModel
+from langchain_core.tools import BaseTool
+from langchain_mcp_adapters.client import MultiServerMCPClient
+
+from evaluator.interfaces.metric_collector import MetricCollector
+from evaluator.components.data_provider import get_data
+from evaluator.utils.module_extractor import create_algorithms, create_metric_collectors
+from evaluator.eval_spec import EVALUATED_ALGORITHMS, METRIC_COLLECTORS
+from evaluator.interfaces.tool_rag_algorithm import ToolRagAlgorithm
+from evaluator.utils.csv_logger import CSVLogger
+from evaluator.components.llm_provider import get_llm
+from dotenv import load_dotenv
+
+load_dotenv()
+
+"""
+# To run the experiments, first start the MCP tool server in one terminal:
+python evaluator/components/mcp_tool_server.py
+
+# Then run the experiment in another terminal:
+python evaluator/run_experiments.py
+"""
+
+
+async def run_all_experiments():
+
+    # Set up the necessary components for the experiments:
+    # - the language model
+    # - the tools to use
+    # - the data to evaluate on
+    # - the evaluation metrics to collect and calculate
+    # - the algorithms to be evaluated
+
+    provider_id = os.getenv("LLM_PROVIDER_ID")
+    model_id = os.getenv("MODEL_ID")
+    base_url = os.getenv("INFERENCE_SERVER_BASE_URL")
+    print(f"Connecting to {provider_id} server on {base_url} serving {model_id}...")
+    llm = get_llm(provider_id=provider_id, model_id=model_id, base_url=base_url)
+    print("Connection established successfully.")
+
+    print("Retrieving available tool definitions...")
+    client = MultiServerMCPClient({
+        "general": {
+            "transport": "streamable_http",
+            "url": "http://127.0.0.1:8000/mcp/"
+        }
+    })
+    tools = await client.get_tools()
+    print(f"Successfully retrieved {len(tools)} tools.")
+
+    print("Fetching query dataset...")
+    queries = get_data()
+    print(f"Successfully retrieved {len(queries)} queries.")
+
+    print("Loading metric collectors...")
+    metric_collectors = create_metric_collectors(METRIC_COLLECTORS)
+    print(f"The following metric collectors will be active during evaluation:\n{METRIC_COLLECTORS}\n")
+
+    print("Loading experimental configurations...")
+    algorithms_to_compare = create_algorithms(EVALUATED_ALGORITHMS)
+    print(f"The following configurations will be executed:\n{EVALUATED_ALGORITHMS}\n")
+
+    # Actually run the experiments
+    with CSVLogger(metric_collectors, Path(os.getenv("OUTPUT_PATH")), metadata_columns=["Experiment ID", "Algorithm"]) as logger:
+        for i, algo in enumerate(algorithms_to_compare):
+            print(f"Running experiment {i} of {len(algorithms_to_compare)}: {algo.get_unique_id()}...")
+            await run_experiment(algo, llm, tools, queries, metric_collectors)
+            logger.log_experiment(meta_values={"Experiment ID": i, "Algorithm": algo.get_unique_id()})
+            print(f"Experiment {i} completed.\n")
+
+
+async def run_experiment(algo: ToolRagAlgorithm,
+                         llm: BaseChatModel,
+                         tools: List[BaseTool],
+                         queries: List[Tuple[str, str]],
+                         metric_collectors: List[MetricCollector]
+                         ):
+
+    algo.set_up(llm, tools)
+    for mc in metric_collectors:
+        mc.set_up()
+
+    for i, (query, correct_tool) in enumerate(queries):
+        print(f"Processing query {i+1} of {len(queries)}...")
+
+        for mc in metric_collectors:
+            mc.prepare_for_measurement(query)
+
+        response = await algo.process_query(query)
+
+        for mc in metric_collectors:
+            mc.register_measurement(query, response=response, correct_tool=correct_tool)
+
+    algo.tear_down()
+    for mc in metric_collectors:
+        mc.tear_down()
+
+
+if __name__ == "__main__":
+    asyncio.run(run_all_experiments())
