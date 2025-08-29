@@ -1,0 +1,34 @@
+{
+  "win": true,
+  "try_count": 1,
+  "trys": [
+    {
+      "query": "Get weather in London and count words of the returned weather description",
+      "function": [
+        {
+          "type": "Action",
+          "content": "weather_info_tool"
+        },
+        {
+          "type": "Action Input",
+          "content": "{\"loc\": \"London\"}"
+        },
+        {
+          "type": "Action",
+          "content": "word_count_tool"
+        },
+        {
+          "type": "Action Input",
+          "content": "{\"text\": \"weather description\"}"
+        },
+        {
+          "type": "Finish",
+          "content": "Word count: 2"
+        }
+      ],
+      "final_answer": "Word count: 2"
+    }
+  ],
+  "query": "Get weather in London and count words of the returned weather description",
+  "query_id": "synthetic_006"
+}

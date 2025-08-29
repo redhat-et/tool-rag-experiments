@@ -1,0 +1,26 @@
+{
+  "win": true,
+  "try_count": 1,
+  "trys": [
+    {
+      "query": "Reverse the word 'algorithm'",
+      "function": [
+        {
+          "type": "Action",
+          "content": "reverse_string_tool"
+        },
+        {
+          "type": "Action Input",
+          "content": "{\"text\": \"algorithm\"}"
+        },
+        {
+          "type": "Finish",
+          "content": "Reversed text: mhtirogla"
+        }
+      ],
+      "final_answer": "Reversed text: mhtirogla"
+    }
+  ],
+  "query": "Reverse the word 'algorithm'",
+  "query_id": "synthetic_003"
+}

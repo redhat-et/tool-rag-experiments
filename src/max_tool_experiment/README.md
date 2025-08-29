@@ -1,141 +1,153 @@
-# LangChain Max Tool Experiment with ToolBench Evaluation
+# Max Tool Experiment - StableToolBench Evaluation
 
-This experiment tests how well LangChain handles increasing numbers of tools using either vllm or local Ollama models by measuring **tool selection accuracy, execution success, and latency plus the StableToolBench solvable pass rate**.
+This project evaluates LangGraph ReAct agents using StableToolBench metrics with a curated synthetic dataset.
 
-## Overview
+## 🎯 Overview
 
-The experiment consists of:
-1. **MCP Tool Server** (`mcp_tool_server.py`) - Provides tools via MCP protocol
-2. **Enhanced Experiment** (`enhanced_maxtool_experiment.py`) - Tests tool selection and execution with ToolBench evaluation
-3. **ToolBench Evaluation** -  StableToolBench pass rate evaluation
+We use a **manual dataset** of 10 carefully crafted queries to test agent performance:
+- **5 simple single-tool queries**: Basic functionality testing
+- **5 logical two-tool queries**: Multi-step reasoning testing
 
-### Available Tools so far
-- `weather_info` - Fetches weather for a location
-- `word_count` - Counts words in text
-- `reverse_string` - Reverses text
-- `uppercase` - Converts text to uppercase
-- `insurance_scorer` - Generates random insurance scores
+## 📁 Project Structure
 
-### Test Queries
-5 fixed queries, each mapped to a ground truth tool:
-1. "What is the weather in New York?" → `weather_info`
-2. "How many words are in 'Hello World, this is a test sentence'?" → `word_count`
-3. "Reverse this text: Python Experiment" → `reverse_string`
-4. "Convert this to uppercase: llamastack" → `uppercase`
-5. "Give me an insurance evaluation score" → `insurance_scorer`
-
-## Prerequisites
-
-### 1. Install uv
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+src/max_tool_experiment/
+├── synthetic_dataset/                    # Manual dataset
+│   ├── test_instruction/
+│   │   └── G1_instruction.json          # 10 curated queries
+│   └── test_query_ids/
+│       └── G1_instruction.json          # Query ID mappings
+├── synthetic_evaluation.py              # Main evaluation script
+├── step_by_step_evaluation.py          # Pipeline orchestrator
+├── run_stabletoolbench_eval.py         # Python-based evaluation runner
+├── mcp_tool_server.py                  # MCP tools implementation
+├── llm_provider.py                     # LLM configuration
+└── synthetic_evaluation_results/       # Evaluation outputs
+    ├── raw_answers/
+    ├── converted_answers/
+    └── evaluation/
 ```
 
-### 2. Install Ollama
+## 🛠️ Available Tools
+
+The evaluation uses 5 MCP tools:
+- `weather_info(loc)`: Get weather for a location
+- `word_count(text)`: Count words in text
+- `reverse_string(text)`: Reverse a string
+- `uppercase(text)`: Convert text to uppercase
+- `insurance_scorer()`: Get insurance score
+
+## 🚀 Quick Start
+
+### 1. Setup Environment
 ```bash
-curl -fsSL https://ollama.ai/install.sh | sh
+# Load environment variables
+export OPENAI_API_KEY="your-key"
+export OPENAI_JUDGE_MODEL="gpt-4o-mini"
+
+# Or use .env file
+echo "OPENAI_API_KEY=your-key" > .env
+echo "OPENAI_JUDGE_MODEL=gpt-4o-mini" >> .env
 ```
 
-### 3. Start Ollama and Pull Model
-```bash
-ollama serve
-ollama pull llama3.2:3b-instruct-fp16
-```
-
-**Note**: For cluster deployments with vLLM, the model will be automatically loaded by the vLLM server.
-
-## Running the Experiment
-
-### Quick Test (Evaluator Only - ~30 seconds)
-```bash
-cd src/max_tool_experiment
-uv run python test_simplified_evaluator.py
-```
-
-### Full Experiment (Complete - ~2-3 minutes)
+### 2. Run Complete Evaluation
 ```bash
 cd src/max_tool_experiment
-./run_experiment.sh
+uv run python step_by_step_evaluation.py
 ```
 
-The script will:
-- ✅ Check dependencies and start services
-- ✅ Run agent execution with ToolBench evaluation and original agent tool call evaluation.
-- ✅ Generate comprehensive metrics and reports
-- ✅ Display experiment summary
-- ✅ Clean up automatically
+### 3. Run Individual Components
 
-## Results
+**Agent Evaluation Only:**
+```bash
+uv run python synthetic_evaluation.py
+```
 
-### Metrics Measured
-- **Agent Metrics**: Tool execution rate, correct tool rate, latency (the same as before)
-- **ToolBench Pass Rate**: StableToolBench evaluation (multiple runs for statistical significance)
-- **Solve Status**: Solved/Unsolved/Unsure classification (evaluated by gpt model, api key needed.)
+**StableToolBench Evaluation Only:**
+```bash
+uv run python run_stabletoolbench_eval_python.py
+```
 
-### Output Files
-- `enhanced_experiment_results.json` - Complete results with both agent and ToolBench metrics
+## 📊 Evaluation Metrics
 
-### Sample Results
+The pipeline generates:
+- **SoPR (Solvable Pass Rate)**: Percentage of queries successfully solved
+- **FAC (Final Answer Correctness)**: Accuracy of final answers
+- **Detailed Results**: Query-by-query analysis
+
+## 📝 Dataset Management
+
+### Edit Queries
+The dataset is manually maintained in `synthetic_dataset/test_instruction/G1_instruction.json`:
+
 ```json
 {
-  "agent_metrics": {
-    "tool_execution_rate": 100.0,
-    "correct_tool_rate": 100.0,
-    "average_latency": 5.51
-  },
-  "toolbench_pass_rate_evaluation": {
-    "overall_statistics": {
-      "pass_rate": 70.0,
-      "std_dev": 10.0
-    }
-  }
-  "detailed_results": [
-      {
-        "query_id": "query_0",
-        "query": "What is the weather in New York?",
-        "expected_tool": "weather_info",
-        "available_tools": [
-          "weather_info",
-          "word_count",
-          "reverse_string",
-          "uppercase",
-          "insurance_scorer"
-        ],
-        "agent_steps": [
-          "weather_info"
-        ],
-        "final_answer": "Current weather conditions in New York are mostly sunny with a high of 75\u00b0F and a low of 50\u00b0F.",
-        "is_solved_evaluations": [
-          "AnswerStatus.Solved",
-          "AnswerStatus.Solved",
-          "AnswerStatus.Solved",
-          "AnswerStatus.Solved"
-        ],
-        "pass_rate": 100.0,
-        "execution_time": 2.845794200897217
-      },
-      
-        .....
+  "api_list": [...],
+  "query": "Your query here",
+  "relevant_APIs": [...],
+  "query_id": "synthetic_XXX"
 }
 ```
 
-## Key Files
+### Add New Queries
+1. Add query to `G1_instruction.json`
+2. Update `test_query_ids/G1_instruction.json` with new ID mapping
+3. Re-run evaluation
 
-- `enhanced_maxtool_experiment.py` - Main experiment script
-- `simplified_toolbench_evaluator.py` - StableToolBench evaluation
-- `mcp_tool_server.py` - MCP tool server
-- `run_experiment.sh` - Automated experiment runner
-- `test_simplified_evaluator.py` - Evaluator test script
+## 🔧 Configuration
 
-## Customization
+### Environment Variables
+- `OPENAI_API_KEY`: OpenAI API key for agent and evaluation
+- `OPENAI_JUDGE_MODEL`: Model for StableToolBench evaluation (default: gpt-4o-mini)
 
-### Adding New Tools
-1. Add tool implementation to `mcp_tool_server.py`
-2. Update `ENHANCED_QUERIES` in `enhanced_maxtool_experiment.py`
-or use mcp proxy to link to StableToolBench dataset.
+### LLM Configuration
+The agent uses OpenAI GPT-3.5-turbo by default. To use different models:
+- Edit `synthetic_evaluation.py` → `initialize_llm()` method
+- Supported: OpenAI, Ollama
 
-### Modifying Evaluation
-Edit `simplified_toolbench_evaluator.py` to customize:
-- Judge prompt in `_judge_is_solved()`
-- Task solvability check in `_check_task_solvable()`
-- Evaluation parameters in `__init__()`
+## 📈 Results Interpretation
+
+### SoPR Score
+- **High (80%+)**: Agent handles most queries well
+- **Medium (40-80%)**: Agent needs improvement
+- **Low (<40%)**: Significant issues with tool usage
+
+### Common Issues
+- **Incomplete answers**: Agent stops after first tool call
+- **Tool response issues**: Empty responses from tools
+- **Format problems**: Incorrect final answer structure
+
+## 🛠️ Troubleshooting
+
+### Common Errors
+1. **API Key Issues**: Check `OPENAI_API_KEY` in environment
+2. **Path Issues**: Ensure working directory is `src/max_tool_experiment`
+3. **Tool Import Errors**: Verify `mcp_tool_server.py` exists
+
+### Debug Mode
+For detailed debugging, run individual components:
+```bash
+# Test agent only
+uv run python synthetic_evaluation.py
+
+# Test evaluation only  
+uv run python run_stabletoolbench_eval_python.py
+```
+
+## 📚 Key Files
+
+- **`synthetic_evaluation.py`**: Main agent evaluation with improved ReAct prompt
+- **`step_by_step_evaluation.py`**: Complete pipeline orchestrator
+- **`run_stabletoolbench_eval.py`**: Python-based StableToolBench runner
+- **`mcp_tool_server.py`**: Tool implementations
+
+## 🎯 Design Decisions
+
+1. **Manual Dataset**: Curated queries for better control and testing
+2. **Improved ReAct Prompt**: Clear instructions for multi-step execution
+3. **Python-based Evaluation**: Reliable environment variable handling
+4. **Component-based Architecture**: Easy to debug and modify individual parts
+
+## 📄 License
+
+See LICENSE file for details.

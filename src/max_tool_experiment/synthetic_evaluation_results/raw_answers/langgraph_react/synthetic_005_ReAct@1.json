@@ -1,0 +1,18 @@
+{
+  "win": true,
+  "try_count": 1,
+  "trys": [
+    {
+      "query": "Get an insurance score for a 40-year-old female living in Tokyo with a home, car, and a dog.",
+      "function": [
+        {
+          "type": "Finish",
+          "content": "Get an insurance score for a 40-year-old female living in Tokyo with a home, car, and a dog."
+        }
+      ],
+      "final_answer": "Get an insurance score for a 40-year-old female living in Tokyo with a home, car, and a dog."
+    }
+  ],
+  "query": "Get an insurance score for a 40-year-old female living in Tokyo with a home, car, and a dog.",
+  "query_id": "synthetic_005"
+}

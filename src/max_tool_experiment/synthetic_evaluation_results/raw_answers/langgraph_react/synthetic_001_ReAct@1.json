@@ -1,0 +1,26 @@
+{
+  "win": true,
+  "try_count": 1,
+  "trys": [
+    {
+      "query": "What's the weather in Tokyo?",
+      "function": [
+        {
+          "type": "Action",
+          "content": "weather_info_tool"
+        },
+        {
+          "type": "Action Input",
+          "content": "{\"loc\": \"Tokyo\"}"
+        },
+        {
+          "type": "Finish",
+          "content": " Weather in Tokyo is sunny."
+        }
+      ],
+      "final_answer": " Weather in Tokyo is sunny."
+    }
+  ],
+  "query": "What's the weather in Tokyo?",
+  "query_id": "synthetic_001"
+}

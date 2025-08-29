@@ -1,0 +1,65 @@
+apis_json: /Users/yuan/vscode/tool-rag-experiments/src/max_tool_experiment/openai_api_pool.json
+batch_size: 1
+completions_kwargs:
+  functions:
+  - description: Parse the json answer with layerd nodes and return the answer_status
+      about the answer
+    name: check_answer_status
+    parameters:
+      properties:
+        answer_status:
+          enum:
+          - Unsure
+          - Unsolved
+          - Solved
+          type: string
+      required:
+      - answer_status
+      type: object
+  - description: Parse the json answer with layerd nodes and return the answer_status
+      about the answer
+    name: parse_answer_status
+    parameters:
+      properties:
+        answer_status:
+          enum:
+          - Unsure
+          - Unsolved
+          - Solved
+          type: string
+      required:
+      - answer_status
+      type: object
+  - description: Parse the task description and return the task_status about the task
+    name: check_task_solvable
+    parameters:
+      properties:
+        task_status:
+          enum:
+          - Unsure
+          - Unsolvable
+          - Solvable
+          type: string
+      required:
+      - task_status
+      type: object
+  - description: Select the better answer with a comprehensive investigation on given
+      aspects. You should ignore the impact of the order of candidate answers.
+    name: select_better_answer
+    parameters:
+      properties:
+        index:
+          description: The `index` value in the selected better answer.
+          type: number
+      required:
+      - index
+      type: object
+  max_tokens: 1000
+  model: gpt-4.1-nano
+  temperature: 0.2
+  timeout: 10
+evaluator_name: tooleval_gpt-3.5-turbo_default
+fn_completion_parser: index_parser
+fn_completions: normalized_openai_completions
+prompt_template: template.txt
+registered_cls_name: ReinforceToolLearningEvaluator
