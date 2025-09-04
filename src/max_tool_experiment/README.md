@@ -1,6 +1,6 @@
-# Max Tool Experiment - StableToolBench Evaluation
+# Max Tool Experiment - FAC-Only Evaluation
 
-This project evaluates LangGraph ReAct agents using StableToolBench metrics with a curated synthetic dataset.
+This project evaluates LangGraph ReAct agents using **Final Answer Correctness (FAC)** metric with a curated synthetic dataset.
 
 ## 🎯 Overview
 
@@ -17,12 +17,11 @@ src/max_tool_experiment/
 │   │   └── G1_instruction.json          # 10 curated queries
 │   └── test_query_ids/
 │       └── G1_instruction.json          # Query ID mappings
-├── synthetic_evaluation.py              # Main evaluation script
-├── step_by_step_evaluation.py          # Pipeline orchestrator
-├── run_stabletoolbench_eval.py         # Python-based evaluation runner
-├── mcp_tool_server.py                  # MCP tools implementation
-├── llm_provider.py                     # LLM configuration
-└── synthetic_evaluation_results/       # Evaluation outputs
+├── fac_only_evaluation.py               # Main FAC evaluation script
+├── stabletoolbench_fac_eval.py          # FAC evaluation runner (modified original StableToolBench)
+├── mcp_tool_server.py                   # MCP tools implementation
+├── llm_provider.py                      # LLM configuration
+└── fac_evaluation_results/              # FAC evaluation outputs
     ├── raw_answers/
     ├── converted_answers/
     └── evaluation/
@@ -40,40 +39,20 @@ The evaluation uses 5 MCP tools:
 ## 🚀 Quick Start
 
 ### 1. Setup Environment
-```bash
-# Load environment variables
-export OPENAI_API_KEY="your-key"
-export OPENAI_JUDGE_MODEL="gpt-4o-mini"
+Edit the `.env` file using `.env.example` as a reference.
 
-# Or use .env file
-echo "OPENAI_API_KEY=your-key" > .env
-echo "OPENAI_JUDGE_MODEL=gpt-4o-mini" >> .env
+### 2. Run FAC Evaluation
+```bash
+./run_experiment.sh
 ```
 
-### 2. Run Complete Evaluation
-```bash
-cd src/max_tool_experiment
-uv run python step_by_step_evaluation.py
-```
-
-### 3. Run Individual Components
-
-**Agent Evaluation Only:**
-```bash
-uv run python synthetic_evaluation.py
-```
-
-**StableToolBench Evaluation Only:**
-```bash
-uv run python run_stabletoolbench_eval_python.py
-```
 
 ## 📊 Evaluation Metrics
 
 The pipeline generates:
-- **SoPR (Solvable Pass Rate)**: Percentage of queries successfully solved
-- **FAC (Final Answer Correctness)**: Accuracy of final answers
-- **Detailed Results**: Query-by-query analysis
+- **FAC (Final Answer Correctness)**: Accuracy of final answers using Openshift hosted LLM judge
+- **Detailed Results**: Query-by-query analysis with reasoning
+- **Performance Metrics**: Success rate and latency
 
 ## 📝 Dataset Management
 
@@ -97,57 +76,85 @@ The dataset is manually maintained in `synthetic_dataset/test_instruction/G1_ins
 ## 🔧 Configuration
 
 ### Environment Variables
-- `OPENAI_API_KEY`: OpenAI API key for agent and evaluation
-- `OPENAI_JUDGE_MODEL`: Model for StableToolBench evaluation (default: gpt-4o-mini)
+- `OPENAI_API_KEY`: OpenAI API key for agent
+- `OPENAI_MODEL`: Model for the agent (default: gpt-4o-mini)
+- `USE_OLLAMA`: Set to 'true' to use Ollama instead of OpenAI
+- `OLLAMA_MODEL`: Ollama model name (default: llama3.2:3b)
+- `OPENSHIFT_EVALUATOR_URL`: OpenShift evaluator API URL for FAC evaluation
 
 ### LLM Configuration
-The agent uses OpenAI GPT-3.5-turbo by default. To use different models:
-- Edit `synthetic_evaluation.py` → `initialize_llm()` method
-- Supported: OpenAI, Ollama
+The system supports both OpenAI and Ollama models:
+- **OpenAI**: Fast, reliable, requires API key
+- **Ollama**: Local, free, may be slower
 
-## 📈 Results Interpretation
+## 🔍 FAC Evaluation Process
 
-### SoPR Score
-- **High (80%+)**: Agent handles most queries well
-- **Medium (40-80%)**: Agent needs improvement
-- **Low (<40%)**: Significant issues with tool usage
+1. **Agent Execution**: LangGraph ReAct agent processes each query
+2. **Answer Extraction**: Final answers are extracted from agent responses
+3. **FAC Evaluation**: OpenShift hosted model evaluates answer correctness
+4. **Results Storage**: Detailed results saved to `fac_evaluation_results/`
 
-### Common Issues
-- **Incomplete answers**: Agent stops after first tool call
-- **Tool response issues**: Empty responses from tools
-- **Format problems**: Incorrect final answer structure
+## 🌐 OpenShift Configuration
 
-## 🛠️ Troubleshooting
+### FAC Evaluation Model
+The FAC evaluation uses your OpenShift hosted model instead of local vLLM:
 
-### Common Errors
-1. **API Key Issues**: Check `OPENAI_API_KEY` in environment
-2. **Path Issues**: Ensure working directory is `src/max_tool_experiment`
-3. **Tool Import Errors**: Verify `mcp_tool_server.py` exists
-
-### Debug Mode
-For detailed debugging, run individual components:
+### Get Your OpenShift Route
 ```bash
-# Test agent only
-uv run python synthetic_evaluation.py
+# Get your OpenShift route
+ROUTE=$(oc get route evaluator-api -o jsonpath='{.spec.host}')
+echo "Your evaluator API URL: https://$ROUTE"
 
-# Test evaluation only  
-uv run python run_stabletoolbench_eval_python.py
+# Test the API
+curl -s https://$ROUTE/generate \
+  -H 'Content-Type: application/json' \
+  -d '{"prompt":"Say hello in one sentence.","max_new_tokens":32,"do_sample":false,"top_p":1.0}' | jq .
 ```
 
-## 📚 Key Files
+## 📈 Understanding Results
 
-- **`synthetic_evaluation.py`**: Main agent evaluation with improved ReAct prompt
-- **`step_by_step_evaluation.py`**: Complete pipeline orchestrator
-- **`run_stabletoolbench_eval.py`**: Python-based StableToolBench runner
-- **`mcp_tool_server.py`**: Tool implementations
+### FAC Results
+- **Solved**: Answer addresses all parts of the query
+- **Unsolved**: Answer incomplete or doesn't address the query
+- **Reason**: Detailed explanation of the evaluation
 
-## 🎯 Design Decisions
+### Success Rate
+- Percentage of queries successfully solved
+- Based on FAC evaluation, not just tool execution
 
-1. **Manual Dataset**: Curated queries for better control and testing
-2. **Improved ReAct Prompt**: Clear instructions for multi-step execution
-3. **Python-based Evaluation**: Reliable environment variable handling
-4. **Component-based Architecture**: Easy to debug and modify individual parts
+## 🚨 Troubleshooting
 
-## 📄 License
+### Common Issues
+1. **Missing API Key**: Ensure `OPENAI_API_KEY` is set
+2. **Model Not Found**: Check `OPENAI_JUDGE_MODEL` is valid
+3. **Tool Import Errors**: Ensure MCP server is running
 
-See LICENSE file for details.
+### Debug Mode
+Run individual components to isolate issues:
+```bash
+# Test MCP tools only
+uv run python mcp_tool_server.py
+
+# Test StableToolBench FAC evaluation only
+uv run python stabletoolbench_fac_eval.py
+```
+
+
+
+## 📚 Technical Details
+
+### LangGraph ReAct Agent
+- Uses structured reasoning with Thought/Action/Observation format
+- Integrates directly with MCP tools
+- Generates final answers in JSON format
+
+### FAC Evaluation
+- Uses modified original StableToolBench code with OpenShift support
+- Evaluates completeness, not factual accuracy
+- Provides detailed reasoning for each evaluation
+- Supports both local vLLM and OpenShift hosted models
+
+### Data Flow
+```
+Synthetic Dataset → LangGraph Agent → Answer Extraction → FAC Evaluation → Results
+```

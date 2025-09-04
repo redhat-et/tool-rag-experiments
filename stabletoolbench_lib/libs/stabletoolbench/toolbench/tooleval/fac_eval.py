@@ -11,7 +11,15 @@ from json import JSONDecodeError
 from tqdm import tqdm
 import argparse
 import os
-from vllm import LLM, SamplingParams
+import requests
+
+# Conditional import for vLLM (only if not using OpenShift)
+try:
+    from vllm import LLM, SamplingParams
+    VLLM_AVAILABLE = True
+except ImportError:
+    VLLM_AVAILABLE = False
+    print("⚠️ vLLM not available, will use OpenShift hosted model if URL provided")
 
 PROMPT="""
 gpt-4-turbo
@@ -79,14 +87,83 @@ xxx
 # HUMAN_PATH = "/yeesuanAI05/thumt/gzc/human_eval.csv"
 # DEVICE  = "cuda"
 
-def parse_args():
-    parser = argparse.ArgumentParser(description="demo")
+class OpenShiftLLM:
+    """OpenShift hosted model interface for FAC evaluation."""
+    
+    def __init__(self, url: str):
+        self.url = url.rstrip('/') + '/generate'
+    
+    def chat(self, message, sampling_params=None, use_tqdm=False):
+        """Simulate vLLM chat interface for OpenShift API."""
+        try:
+            # Extract the prompt from the message
+            prompt = message[0]['content']
+            
+            # Prepare payload for OpenShift API
+            payload = {
+                "prompt": prompt,
+                "max_new_tokens": 512,
+                "do_sample": False,
+                "top_p": 1.0
+            }
+            
+            response = requests.post(
+                self.url,
+                json=payload,
+                headers={"Content-Type": "application/json"},
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                print(f"🔍 OpenShift API response: {result}")
+                
+                # Try different possible response formats
+                generated_text = ""
+                if "generated_text" in result:
+                    generated_text = result["generated_text"]
+                elif "text" in result:
+                    generated_text = result["text"]
+                elif "response" in result:
+                    generated_text = result["response"]
+                elif "output" in result:
+                    generated_text = result["output"]
+                else:
+                    # If no standard field, try to extract from the response
+                    generated_text = str(result)
+                
+                # Extract only the evaluation part (after "Answer Status:")
+                if "Answer Status:" in generated_text:
+                    evaluation_start = generated_text.find("Answer Status:")
+                    generated_text = generated_text[evaluation_start:]
+                
+                print(f"🔍 Extracted evaluation: {generated_text[:200]}...")
+                
+                # Return in vLLM format for compatibility
+                return [type('obj', (object,), {
+                    'outputs': [type('obj', (object,), {'text': generated_text})()]
+                })()]
+            else:
+                print(f"❌ OpenShift API error: {response.status_code} - {response.text}")
+                return [type('obj', (object,), {
+                    'outputs': [type('obj', (object,), {'text': "Answer Status: Unsolved\nReason: API call failed"})()]
+                })()]
+                
+        except Exception as e:
+            print(f"❌ Error calling OpenShift model: {e}")
+            return [type('obj', (object,), {
+                'outputs': [type('obj', (object,), {'text': f"Answer Status: Unsolved\nReason: Error: {e}"})()]
+            })()]
 
-    parser.add_argument("--model_path", type=str)
-    parser.add_argument("--evaluation_path", type=str)
-    parser.add_argument("--output_path", type=str)
-    parser.add_argument("--evaluated", action="store_true")
-    parser.add_argument("--ids", type=str, default=None)
+def parse_args():
+    parser = argparse.ArgumentParser(description="FAC evaluation with local vLLM or OpenShift hosted model")
+
+    parser.add_argument("--model_path", type=str, help="Path to local vLLM model (if not using OpenShift)")
+    parser.add_argument("--openshift_url", type=str, help="OpenShift hosted model URL (alternative to local vLLM)")
+    parser.add_argument("--evaluation_path", type=str, required=True, help="Path to evaluation data")
+    parser.add_argument("--output_path", type=str, required=True, help="Path to save results")
+    parser.add_argument("--evaluated", action="store_true", help="Use pre-evaluated results")
+    parser.add_argument("--ids", type=str, required=True, help="Path to test IDs")
 
     return parser.parse_args()
 
@@ -116,7 +193,12 @@ def run_human_eval():
     df.to_csv(MODEL_PATH + "model_human_eval.csv", index=False)
 
 def get_response(text):
-    text = text.lower().strip()
+    # Handle NaN/None values
+    if pd.isna(text) or text is None:
+        return 0
+    
+    # Convert to string and handle
+    text = str(text).lower().strip()
     
     if "unsolved" in text:
         return 0
@@ -127,9 +209,23 @@ def get_response(text):
             
 def main(args):
     if args.evaluated is not True:
-        # pipeline = transformers.pipeline("text-generation", model=args.model_path, model_kwargs={"torch_dtype": torch.bfloat16}, device_map="auto")
-        llm = LLM(model=args.model_path)
-        sampling_params = SamplingParams(temperature=0, max_tokens=512)
+        # Initialize LLM based on arguments
+        if args.openshift_url:
+            print(f"🔍 Using OpenShift hosted model: {args.openshift_url}")
+            llm = OpenShiftLLM(args.openshift_url)
+            sampling_params = None  # Not used for OpenShift
+        elif args.model_path and VLLM_AVAILABLE:
+            print(f"🔍 Using local vLLM model: {args.model_path}")
+            llm = LLM(model=args.model_path)
+            sampling_params = SamplingParams(temperature=0, max_tokens=512)
+        else:
+            if not VLLM_AVAILABLE:
+                print("❌ vLLM not available and no OpenShift URL provided")
+                print("💡 Please provide --openshift_url or install vLLM")
+                return False
+            else:
+                print("❌ No model path or OpenShift URL provided")
+                return False
         data = []
         with open(args.evaluation_path, "r") as f:
             data = json.load(f)
@@ -159,6 +255,8 @@ def main(args):
                     "role": "user",
                     "content": prompt
                 }]
+                
+                # Call LLM (works for both vLLM and OpenShift)
                 evaluation = llm.chat(message, sampling_params, use_tqdm=False)
                 evaluation = evaluation[0].outputs[0].text
                 out["query"].append(query)
