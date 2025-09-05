@@ -17,12 +17,12 @@ load_dotenv()
 def run_stabletoolbench_fac_eval():
     """Run StableToolBench FAC evaluation using original code."""
     
-    # Paths - go up to project root
-    project_root = Path(__file__).parent.parent.parent
+    # Paths - relative to current working directory (evaluator folder)
+    project_root = Path("..")  # Go up one level from evaluator to project root
     stabletoolbench_dir = project_root / "stabletoolbench_lib/libs/stabletoolbench"
-    converted_answers_path = project_root / "fac_evaluation_results/converted_answers/langgraph_react/G1_instruction.json"
+    converted_answers_path = Path("fac_evaluation_results/converted_answers/langgraph_react/G1_instruction.json")
     test_ids_path = project_root / "src/max_tool_experiment/synthetic_dataset/test_query_ids/G1_instruction.json"
-    output_path = project_root / "fac_evaluation_results/evaluation/fac_results.csv"
+    output_path = Path("fac_evaluation_results/evaluation/fac_results.csv")
     
     # Ensure output directory exists
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -75,7 +75,7 @@ def run_stabletoolbench_fac_eval():
         result = subprocess.run(
             cmd,
             env=env,
-            cwd=str(project_root),  # Run from project root
+            cwd=".",  # Run from current directory (evaluator)
             capture_output=True,
             text=True,
             check=True

@@ -6,8 +6,8 @@ from pathlib import Path
 def get_data() -> List[Tuple[str, str]]:
     """Load queries from the synthetic dataset."""
     try:
-        # Load from the synthetic dataset
-        dataset_path = Path("src/max_tool_experiment/synthetic_dataset/test_instruction/G1_instruction.json")
+        # Load from the synthetic dataset (relative to project root)
+        dataset_path = Path("../src/max_tool_experiment/synthetic_dataset/test_instruction/G1_instruction.json")
         
         if not dataset_path.exists():
             print(f"⚠️ Dataset not found at {dataset_path}, using fallback queries")
