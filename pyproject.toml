@@ -19,4 +19,5 @@ dependencies = [
     "langgraph>=0.2.0",
     "fastmcp>=0.1.0",
     "requests>=2.25.0",
+    "huggingface-hub>=0.34.0",
 ]

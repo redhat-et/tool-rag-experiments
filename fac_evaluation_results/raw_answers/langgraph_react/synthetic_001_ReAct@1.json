@@ -1,0 +1,9 @@
+{
+  "query_id": "synthetic_001",
+  "query": "What's the weather in Tokyo?",
+  "response": {
+    "output": "",
+    "type": "dict_response"
+  },
+  "timestamp": 1757066370.209184
+}

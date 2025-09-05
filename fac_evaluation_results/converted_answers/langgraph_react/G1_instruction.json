@@ -1,0 +1,62 @@
+{
+  "synthetic_001": {
+    "query": "What's the weather in Tokyo?",
+    "answer": {
+      "final_answer": "{\"final_answer\": \"The weather in Tokyo is sunny.\"}"
+    }
+  },
+  "synthetic_002": {
+    "query": "How many words are in this text: 'Machine learning is transforming the world'?",
+    "answer": {
+      "final_answer": "{\"final_answer\": \"The text \\\"Machine learning is transforming the world\\\" contains 6 words.\"}"
+    }
+  },
+  "synthetic_003": {
+    "query": "Reverse the word 'algorithm'",
+    "answer": {
+      "final_answer": "{\"final_answer\": \"The word \\\"algorithm\\\" reversed is \\\"mhtirogla\\\".\"}"
+    }
+  },
+  "synthetic_004": {
+    "query": "Convert 'artificial intelligence' to uppercase",
+    "answer": {
+      "final_answer": "{\"final_answer\": \"The phrase \\\"artificial intelligence\\\" in uppercase is \\\"ARTIFICIAL INTELLIGENCE\\\".\"}"
+    }
+  },
+  "synthetic_005": {
+    "query": "Get an insurance score for a 40-year-old female living in Tokyo with a home, car, and a dog.",
+    "answer": {
+      "final_answer": "{\"final_answer\": \"Your insurance score is 9.\"}"
+    }
+  },
+  "synthetic_006": {
+    "query": "Get weather in London and count words of the returned weather description",
+    "answer": {
+      "final_answer": "{\"final_answer\": \"The weather in London is sunny, and the word count of the weather description is 1.\"}"
+    }
+  },
+  "synthetic_007": {
+    "query": "Reverse 'programming' and then convert it to uppercase",
+    "answer": {
+      "final_answer": "{\"final_answer\": \"The reversed text is \\\"gnimmargorp\\\" and the uppercase version is \\\"PROGRAMMING\\\".\"}"
+    }
+  },
+  "synthetic_008": {
+    "query": "Count words in this sentence and convert 'technology' to uppercase: 'Technology is advancing rapidly'",
+    "answer": {
+      "final_answer": "{\"final_answer\": \"The sentence has 4 words, and the word 'technology' in uppercase is 'TECHNOLOGY'.\"}"
+    }
+  },
+  "synthetic_009": {
+    "query": "Check weather in both New York and London",
+    "answer": {
+      "final_answer": "{\"final_answer\": \"The weather in both New York and London is sunny.\"}"
+    }
+  },
+  "synthetic_010": {
+    "query": "Reverse 'innovation' and count words in this text: 'Innovation drives progress'",
+    "answer": {
+      "final_answer": "{\"final_answer\": \"The reversed word is \\\"noitavonni\\\" and the text contains 3 words.\"}"
+    }
+  }
+}

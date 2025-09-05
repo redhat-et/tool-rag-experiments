@@ -1,0 +1,9 @@
+{
+  "query_id": "synthetic_005",
+  "query": "Get an insurance score for a 40-year-old female living in Tokyo with a home, car, and a dog.",
+  "response": {
+    "output": "",
+    "type": "dict_response"
+  },
+  "timestamp": 1757066370.2092018
+}
