@@ -2,7 +2,7 @@ import asyncio
 import sys
 import os
 sys.path.append('/Users/eoconnor/small-model-experiments')
-from mcp_proxy_setup import register_tools_from_dir, make_mcp_proxy_tool
+from mcp_proxy import register_tools_from_dir
 from mcp.server.fastmcp import FastMCP
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph.prebuilt import create_react_agent
@@ -16,13 +16,14 @@ PROVIDER_ID = "ollama"  # or "vllm" or "openai"
 MODEL_ID = "llama3.2:3b-instruct-fp16"  # or your model name
 BASE_URL = "http://localhost:11434"  # or your LLM base URL
 
+
 async def main():
     # Get MirrorAPI URL from environment variable or use default
     mirror_api_url = os.getenv("MIRROR_API_BASE_URL", "http://localhost:8000")
     
     # Start MCP server and register tools from the first category (n=10)
     mcp = FastMCP("General", port=9000)
-    register_tools_from_dir(mcp, "toolenv2404_filtered", n=10, base_url=mirror_api_url)
+    register_tools_from_dir(mcp, "toolenv2404_filtered", base_url=mirror_api_url)
     # Start the MCP server in the background (for demo, in production run separately)
     import threading
     threading.Thread(target=lambda: mcp.run(transport="streamable-http"), daemon=True).start()

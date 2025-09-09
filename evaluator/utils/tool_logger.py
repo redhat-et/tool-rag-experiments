@@ -1,3 +1,5 @@
+import functools
+import os
 from typing import List
 
 
@@ -26,3 +28,18 @@ class ToolLogger(object):
                 f.write("")
         except Exception as e:
             print(f"❌ Error clearing tool_log.txt: {e}")
+
+
+def log_tool(tool_name):
+    print(f"Logging tool: {tool_name}")
+
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            # Create file if it doesn't exist
+            with open(os.getenv("TOOL_LOG_PATH"), "a") as f:
+                f.write(f"[TOOL] {tool_name}\n")
+            print(f"Executing tool {tool_name}")
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator

@@ -7,6 +7,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.tools import BaseTool
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
+from evaluator.components.mcp_proxy.mcp_proxy import run_mcp_proxy
 from evaluator.interfaces.metric_collector import MetricCollector
 from evaluator.components.data_provider import get_data
 from evaluator.utils.module_extractor import create_algorithms, create_metric_collectors
@@ -44,13 +45,8 @@ async def run_all_experiments():
     print("Connection established successfully.")
 
     print("Retrieving available tool definitions...")
-    client = MultiServerMCPClient({
-        "general": {
-            "transport": "streamable_http",
-            "url": "http://127.0.0.1:8000/mcp/"
-        }
-    })
-    tools = await client.get_tools()
+    mcp_client = await set_up_mcp()
+    tools = await mcp_client.get_tools()
     print(f"Successfully retrieved {len(tools)} tools.")
 
     print("Fetching query dataset...")
@@ -72,6 +68,18 @@ async def run_all_experiments():
             await run_experiment(algo, llm, tools, queries, metric_collectors)
             logger.log_experiment(meta_values={"Experiment ID": i, "Algorithm": algo.get_unique_id()})
             print(f"Experiment {i} completed.\n")
+
+
+async def set_up_mcp():
+    await run_mcp_proxy(run_detached=True)
+    mcp_proxy_port = os.getenv("MCP_PROXY_LOCAL_PORT", 9000)
+    client = MultiServerMCPClient({
+        "general": {
+            "transport": "streamable_http",
+            "url": f"http://127.0.0.1:{mcp_proxy_port}/mcp/"
+        }
+    })
+    return client
 
 
 async def run_experiment(algo: ToolRagAlgorithm,
