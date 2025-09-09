@@ -89,42 +89,11 @@ else
     fi
 fi
 
-# Function to cleanup background processes
-cleanup() {
-    echo "🧹 Cleaning up..."
-    if [ ! -z "$MCP_PID" ]; then
-        kill $MCP_PID 2>/dev/null || true
-        echo "   Stopped MCP server (PID: $MCP_PID)"
-    fi
-    exit 0
-}
-
 # Set up signal handlers
 trap cleanup SIGINT SIGTERM
-
-# Start MCP server in background
-echo "🔧 Starting MCP tool server..."
-python components/mcp_tool_server.py &
-MCP_PID=$!
-
-# Wait a moment for the server to start
-sleep 3
-
-# Check if MCP server started successfully
-if ! curl -s http://127.0.0.1:8000/mcp/ > /dev/null 2>&1; then
-    echo "❌ Error: MCP server failed to start"
-    cleanup
-    exit 1
-fi
-
-echo "✅ MCP server started successfully (PID: $MCP_PID)"
-echo "🧪 Running experiment..."
+echo "🧪 Running experiments..."
 
 # Run the experiment
 python run_experiments.py
 
 echo "✅ Experiment completed!"
-echo "📊 Results saved to: experiment_results_langchain_ollama.csv"
-
-# Cleanup
-cleanup 
