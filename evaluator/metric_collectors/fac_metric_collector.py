@@ -1,17 +1,10 @@
 import json
-import sys
 import os
 import requests
 from typing import Dict, List, Any
-from pathlib import Path
-
-# Add the project root to the path
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
 
 from evaluator.interfaces.metric_collector import MetricCollector
 from evaluator.utils.module_extractor import register_metric_collector
-from evaluator.utils.tool_logger import ToolLogger
 
 
 @register_metric_collector("fac_metric_collector")
@@ -55,7 +48,7 @@ Here are some examples:
 
 Query 1: I'm planning a movie night with my friends and we want to watch a horror film. Can you recommend some popular horror movies available on streaming platforms in the US? Also, provide the runtime and IMDb ratings for these movies.
 Answer 1: Here are some popular horror movies available on streaming platforms in the US:\n\n1. Knives Out\n   - Runtime: 130 minutes\n   - IMDb Rating: 7.9/10\n   - Available on: Netflix, Prime Video, Hulu, Amazon Prime Video\n\n2. Jumanji: The Next Level\n   - Runtime: 110 minutes\n   - IMDb Rating: 6.7/10\n   - Available on: Hulu, Amazon Prime Video, Netflix\n\nPlease note that availability may vary depending on your location and streaming platform subscriptions. Enjoy your movie night!
-Answer Status: Solved0304
+Answer Status: Solved
 Reason: The answer addressed all parts of subqueries by providing a list of popular horror movies available on streaming platforms in the US, along with their runtime and IMDb ratings. Whether the film is horror is a factual matter that does not to be checked.
 
 Query 2: I'm a screenwriter looking for inspiration for my next project. Can you help me find a list of critically acclaimed movies available on streaming platforms in the US? Also, provide me with the streaming sources for the movie 'Citizen Kane' and the basic information about the cast, including their names and professions.
@@ -83,39 +76,26 @@ xxx
     
     def __init__(self, settings: Dict):
         super().__init__(settings)
-        self.logger = ToolLogger("fac_metric_collector.log")
         
         # Metrics storage
         self.query_results = []
-        self.total_queries = 0
-        self.solved_queries = 0
-        self.total_latency = 0.0
         
         # judge model configuration
-        self.remote_judge_model = os.getenv('REMOTE_JUDGE_MODEL')
-        if not self.remote_judge_model:
-            raise ValueError("REMOTE_JUDGE_MODEL environment variable is required")
+        self.judge_model_url = os.getenv('JUDGE_MODEL_URL')
+        if not self.judge_model_url:
+            raise ValueError("JUDGE_MODEL_URL environment variable is required")
         
-        # Configuration options, show judge model output and detailed explanation
-        self.show_judge_output = settings.get('show_judge_output', True)
-        self.show_detailed_explanation = settings.get('show_detailed_explanation', True)
+        # Configuration options
+        self.verbose = settings.get('verbose', True)
 
     def get_collected_metrics_names(self) -> List[str]:
         return [
-            "FAC Solve Rate (%)",
-            "FAC Total Queries",
-            "FAC Solved Queries", 
-            "FAC Unsolved Queries",
-            "FAC Average Latency (s)",
-            "FAC Total Latency (s)"
+            "FAC Solve Rate (%)"
         ]
 
     def set_up(self) -> None:
         """Initialize the FAC metric collector."""
         super().set_up()
-        print("🚀 Setting up FAC Metric Collector...")
-        print(f"🔍 Using OpenShift URL: {self.remote_judge_model}")
-        print("✅ FAC Metric Collector setup complete")
 
     def prepare_for_measurement(self, query: str) -> None:
         """Prepare for measuring a single query."""
@@ -123,52 +103,26 @@ xxx
 
     def register_measurement(self, query: str, response: Any = None, correct_tool: str = None) -> None:
         """Register measurement for a single query."""
-        import time
-        
-        start_time = time.time()
-        
         try:
             # Extract final answer from algorithm response
             final_answer = self.extract_final_answer_from_response(response)
             
-            # Evaluate using OpenShift judge model
-            evaluation_result = self.evaluate_with_openshift_judge(query, final_answer)
-            
-            latency = time.time() - start_time
-            
-            result = {
-                "query": query,
-                "response": response,
-                "final_answer": final_answer,
-                "evaluation": evaluation_result["evaluation"],
-                "is_solved": evaluation_result["is_solved"],
-                "latency": latency,
-                "correct_tool": correct_tool
-            }
-            
-            self.total_latency += latency
-            self.query_results.append(result)
+            # Evaluate using LLM judge model
+            evaluation_result = self.evaluate_with_llm_judge(query, final_answer)
             
             status_emoji = "✅" if evaluation_result["is_solved"] else "❌"
-            print(f"📊 FAC Query Evaluated: {query[:50]}... {status_emoji} (latency: {latency:.2f}s)")
             
-            # Show detailed judge model output
-            self.log_judge_output(query, final_answer, evaluation_result["evaluation"], evaluation_result["is_solved"])
+            # Always store only the boolean for memory efficiency
+            self.query_results.append(evaluation_result["is_solved"])
+            
+            if self.verbose:
+                print(f"📊 FAC Query Evaluated: {query[:50]}... {status_emoji}")
+                # Show detailed judge model output
+                self.log_judge_output(query, final_answer, evaluation_result["evaluation"], evaluation_result["is_solved"])
             
         except Exception as e:
-            latency = time.time() - start_time
-            result = {
-                "query": query,
-                "response": response,
-                "final_answer": "",
-                "evaluation": f"Error: {str(e)}",
-                "is_solved": False,
-                "latency": latency,
-                "error": str(e)
-            }
-            self.total_latency += latency
-            self.query_results.append(result)
-            print(f"❌ FAC Query Error: {e}")
+            # Store False for failed evaluations
+            self.query_results.append(False)
 
     def extract_final_answer_from_response(self, response: Any) -> str:
         """Extract final answer from algorithm response."""
@@ -196,15 +150,16 @@ xxx
                 
         except Exception as e:
             print(f"❌ Error extracting final answer: {e}")
+            print(f"🔍 Faulty response: {response}")
             return str(response) if response else ""
 
-    def evaluate_with_openshift_judge(self, query: str, answer: str) -> Dict[str, Any]:
-        """Evaluate query-answer pair using OpenShift judge model."""
+    def evaluate_with_llm_judge(self, query: str, answer: str) -> Dict[str, Any]:
+        """Evaluate query-answer pair using LLM judge model."""
         try:
             # Format the prompt
             prompt = self.FAC_JUDGE_PROMPT.format(query=query, answer=answer)
             
-            # Prepare payload for OpenShift API
+            # Prepare payload for llm judge model
             payload = {
                 "prompt": prompt,
                 "max_new_tokens": 512,
@@ -212,9 +167,9 @@ xxx
                 "top_p": 1.0
             }
             
-            # Call judge model API
+            # Call judge model
             response = requests.post(
-                self.remote_judge_model,
+                self.judge_model_url,
                 json=payload,
                 headers={"Content-Type": "application/json"},
                 timeout=30
@@ -251,9 +206,9 @@ xxx
                 }
             else:
                 error_msg = f"API call failed: {response.status_code} - {response.text}"
-                print(f"❌ Judge model API error: {error_msg}")
+                print(f"❌ LLM judge model API error: {error_msg}")
                 print(f"🔍 Debug info:")
-                print(f"   URL: {self.remote_judge_model}")
+                print(f"   URL: {self.judge_model_url}")
                 print(f"   Payload: {json.dumps(payload, indent=2)}")
                 print(f"   Response: {response.text}")
                 return {
@@ -262,10 +217,10 @@ xxx
                 }
                 
         except Exception as e:
-            error_msg = f"Error calling judge model: {e}"
+            error_msg = f"Error calling LLM judge model: {e}"
             print(f"❌ {error_msg}")
             print(f"🔍 Debug info:")
-            print(f"   URL: {self.remote_judge_model}")
+            print(f"   URL: {self.judge_model_url}")
             print(f"   Error: {e}")
             return {
                 "evaluation": f"Answer Status: Unsolved\nReason: {error_msg}",
@@ -294,70 +249,34 @@ xxx
 
     def log_judge_output(self, query: str, answer: str, evaluation: str, is_solved: bool):
         """Log detailed judge model output and explanation."""
-        if not self.show_judge_output:
-            return
-        
         print(f"\n{'='*60}")
         print(f"🔍 JUDGE MODEL EVALUATION")
         print(f"{'='*60}")
         
         print(f"📝 Query: {query}")
-        print(f"💬 Answer: {answer}")
-        print(f"⚖️  Judge Decision: {'SOLVED' if is_solved else 'UNSOLVED'}")
-        
-        if self.show_detailed_explanation:
-            print(f"\n📋 Full Judge Model Output:")
-            print(f"{'-'*40}")
-            print(evaluation)
-            print(f"{'-'*40}")
-        else:
-            # Extract just the key parts
-            lines = evaluation.split('\n')
-            for line in lines:
-                line = line.strip()
-                if line.startswith('Answer Status') or line.startswith('Reason'):
-                    print(f"📋 {line}")
-        
-        print(f"{'='*60}\n")
+        print(f"💬 Agent's Answer: {answer}")
+        print(f"\n📋 Judge Model Output:")
+        print(f"{'-'*40}")
+        print(evaluation)
+        print(f"{'-'*40}")
 
     def tear_down(self) -> None:
         """Clean up after all measurements."""
-        print("🧹 Starting FAC Metric Collector tear down...")
-        
-        # Mark collection as complete
-        self.collection_active = False
-        print(f"🧹 Collection marked as complete: {self.collection_active}")
-        
         super().tear_down()
-        print("🧹 FAC Metric Collector torn down")
 
     def report_results(self) -> Dict[str, Any]:
         """Report the collected metrics."""
-        print(f"🔍 report_results called, collection_active: {self.collection_active}")
-        if self.collection_active:
-            raise RuntimeError(f"Metric collector {self.get_name()}: cannot report results while collection is active")
         
-        if self.total_queries == 0:
-            self.total_queries = len(self.query_results)
-        
-        if self.total_queries == 0:
-            raise RuntimeError("No FAC evaluation results available. Run evaluation first.")
-        
+        total_queries = len(self.query_results)
         # Count solved queries from our direct evaluations
-        solved_queries = sum(1 for result in self.query_results if result.get("is_solved", False))
-        solve_rate = (solved_queries / self.total_queries) * 100 if self.total_queries > 0 else 0
-        average_latency = self.total_latency / self.total_queries if self.total_queries > 0 else 0
+        solved_queries = sum(1 for is_solved in self.query_results if is_solved)
+        solve_rate = (solved_queries / total_queries) * 100
         
         results = {
-            "FAC Solve Rate (%)": solve_rate,
-            "FAC Total Queries": self.total_queries,
-            "FAC Solved Queries": solved_queries,
-            "FAC Unsolved Queries": self.total_queries - solved_queries,
-            "FAC Average Latency (s)": average_latency,
-            "FAC Total Latency (s)": self.total_latency
+            "FAC Solve Rate (%)": solve_rate
         }
         
-        print(f"📊 FAC Results: {solve_rate:.1f}% solve rate, {average_latency:.2f}s avg latency")
-        print(f"📊 Solved: {solved_queries}/{self.total_queries} queries")
+        print(f"📊 FAC Results: {solve_rate:.1f}% solve rate")
+        print(f"📊 Solved: {solved_queries}/{total_queries} queries")
         
         return results

@@ -10,7 +10,6 @@ EVALUATED_ALGORITHMS: List[Spec] = [
 METRIC_COLLECTORS: List[Spec] = [
     ("basic_metric_collector", {}),
     ("fac_metric_collector", {
-        "show_judge_output": True,        # Show judge model output for each query
-        "show_detailed_explanation": True  # Show full judge model response (set to True for debugging)
+        "verbose": True  # True for detailed output, False for minimal output
     }),
 ]
