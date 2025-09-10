@@ -1,4 +1,5 @@
 import json
+import os
 from typing import Tuple, List
 from pathlib import Path
 
@@ -6,11 +7,12 @@ from pathlib import Path
 def get_data() -> List[Tuple[str, str]]:
     """Load queries from the synthetic dataset."""
     try:
-        # Load from the synthetic dataset (relative to project root)
-        dataset_path = Path("../src/max_tool_experiment/synthetic_dataset/test_instruction/G1_instruction.json")
+        # Get dataset path from environment variable
+        dataset_path = Path(os.getenv("INSTRUCTION_DATASET_PATH"))
         
         if not dataset_path.exists():
-            print(f"⚠️ Dataset not found at {dataset_path}, using fallback queries")
+            print(f"⚠️ Dataset not found at {dataset_path}")
+            print("Using fallback queries")
             return get_fallback_queries()
         
         with open(dataset_path, 'r') as f:
