@@ -1,9 +1,0 @@
-{
-  "query_id": "synthetic_002",
-  "query": "How many words are in this text: 'Machine learning is transforming the world'?",
-  "response": {
-    "output": "",
-    "type": "dict_response"
-  },
-  "timestamp": 1757066370.209193
-}

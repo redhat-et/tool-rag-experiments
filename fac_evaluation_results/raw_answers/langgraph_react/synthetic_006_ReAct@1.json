@@ -1,9 +1,0 @@
-{
-  "query_id": "synthetic_006",
-  "query": "Get weather in London and count words of the returned weather description",
-  "response": {
-    "output": "",
-    "type": "dict_response"
-  },
-  "timestamp": 1757066370.209205
-}
