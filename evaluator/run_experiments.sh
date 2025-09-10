@@ -89,56 +89,11 @@ else
     fi
 fi
 
-# Function to cleanup background processes
-cleanup() {
-    echo "🧹 Cleaning up..."
-    if [ ! -z "$MCP_PID" ]; then
-        kill $MCP_PID 2>/dev/null || true
-        echo "   Stopped MCP server (PID: $MCP_PID)"
-    fi
-    exit 0
-}
-
 # Set up signal handlers
 trap cleanup SIGINT SIGTERM
-
-# Kill any existing MCP server on port 8000
-echo "🔧 Checking for existing MCP server..."
-if lsof -i :8000 > /dev/null 2>&1; then
-    echo "⚠️ Port 8000 is in use, killing existing process..."
-    lsof -ti :8000 | xargs kill -9 2>/dev/null || true
-    sleep 2
-fi
-
-# Start MCP server in background
-echo "🔧 Starting MCP tool server..."
-cd components
-# Set tool log path relative to MCP server's working directory (components)
-export TOOL_LOG_PATH="tool_log.txt"
-PYTHONPATH=.. uv run python mcp_tool_server.py &
-MCP_PID=$!
-cd ..
-
-# Wait a moment for the server to start
-sleep 3
-
-# Check if MCP server started successfully
-if ! curl -s http://127.0.0.1:8000/mcp/ > /dev/null 2>&1; then
-    echo "❌ Error: MCP server failed to start"
-    cleanup
-    exit 1
-fi
-
-echo "✅ MCP server started successfully (PID: $MCP_PID)"
-echo "🧪 Running experiment..."
+echo "🧪 Running experiments..."
 
 # Run the experiment
-# Set tool log path relative to current directory (evaluator)
-export TOOL_LOG_PATH="components/tool_log.txt"
-PYTHONPATH=.. uv run python run_experiments.py
+python run_experiments.py
 
 echo "✅ Experiment completed!"
-echo "📊 Results saved to: experiment_results.csv"
-
-# Cleanup
-cleanup 
