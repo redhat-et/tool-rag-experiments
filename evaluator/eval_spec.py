@@ -9,4 +9,7 @@ EVALUATED_ALGORITHMS: List[Spec] = [
 
 METRIC_COLLECTORS: List[Spec] = [
     ("basic_metric_collector", {}),
+    ("fac_metric_collector", {
+        "verbose": True  # True for detailed output, False for minimal output
+    }),
 ]
