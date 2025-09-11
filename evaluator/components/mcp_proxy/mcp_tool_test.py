@@ -23,7 +23,7 @@ async def main():
     
     # Start MCP server and register tools from the first category (n=10)
     mcp = FastMCP("General", port=9000)
-    register_tools_from_dir(mcp, "toolenv2404_filtered", base_url=mirror_api_url)
+    register_tools_from_dir(mcp, ["toolenv2404_filtered"], base_url=mirror_api_url)
     # Start the MCP server in the background (for demo, in production run separately)
     import threading
     threading.Thread(target=lambda: mcp.run(transport="streamable-http"), daemon=True).start()

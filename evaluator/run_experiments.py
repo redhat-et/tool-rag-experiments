@@ -9,9 +9,9 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 
 from evaluator.components.mcp_proxy.mcp_proxy import run_mcp_proxy
 from evaluator.interfaces.metric_collector import MetricCollector
-from evaluator.components.data_provider import get_data
+from evaluator.components.query_provider import get_queries
 from evaluator.utils.module_extractor import create_algorithms, create_metric_collectors
-from evaluator.eval_spec import EVALUATED_ALGORITHMS, METRIC_COLLECTORS
+from evaluator.eval_spec import EVALUATED_ALGORITHMS, METRIC_COLLECTORS, DATASET_SETTINGS
 from evaluator.interfaces.tool_rag_algorithm import ToolRagAlgorithm
 from evaluator.utils.csv_logger import CSVLogger
 from evaluator.components.llm_provider import get_llm
@@ -37,6 +37,8 @@ async def run_all_experiments():
     # - the evaluation metrics to collect and calculate
     # - the algorithms to be evaluated
 
+    print(f"Launching evaluation setup with the following parameters:\n{DATASET_SETTINGS}\n")
+
     provider_id = os.getenv("LLM_PROVIDER_ID")
     model_id = os.getenv("MODEL_ID")
     base_url = os.getenv("INFERENCE_SERVER_BASE_URL")
@@ -45,13 +47,13 @@ async def run_all_experiments():
     print("Connection established successfully.")
 
     print("Retrieving available tool definitions...")
-    mcp_client = await set_up_mcp()
+    mcp_client, tool_names = await set_up_mcp()
     tools = await mcp_client.get_tools()
     print(f"Successfully retrieved {len(tools)} tools.")
 
     print("Fetching query dataset...")
-    queries = get_data()
-    print(f"Successfully retrieved {len(queries)} queries.")
+    queries = get_queries(tool_names)
+    print(f"Successfully loaded {len(queries)} queries.")
 
     print("Loading metric collectors...")
     metric_collectors = create_metric_collectors(METRIC_COLLECTORS)
@@ -64,14 +66,14 @@ async def run_all_experiments():
     # Actually run the experiments
     with CSVLogger(metric_collectors, Path(os.getenv("OUTPUT_PATH")), metadata_columns=["Experiment ID", "Algorithm"]) as logger:
         for i, algo in enumerate(algorithms_to_compare):
-            print(f"Running experiment {i} of {len(algorithms_to_compare)}: {algo.get_unique_id()}...")
+            print(f"Running experiment {i+1} of {len(algorithms_to_compare)}: {algo.get_unique_id()}...")
             await run_experiment(algo, llm, tools, queries, metric_collectors)
-            logger.log_experiment(meta_values={"Experiment ID": i, "Algorithm": algo.get_unique_id()})
-            print(f"Experiment {i} completed.\n")
+            logger.log_experiment(meta_values={"Experiment ID": i+1, "Algorithm": algo.get_unique_id()})
+            print(f"Experiment {i+1} completed.\n")
 
 
 async def set_up_mcp():
-    await run_mcp_proxy(run_detached=True)
+    registered_tool_names = await run_mcp_proxy(run_detached=True)
     mcp_proxy_port = os.getenv("MCP_PROXY_LOCAL_PORT", 9000)
     client = MultiServerMCPClient({
         "general": {
@@ -79,7 +81,7 @@ async def set_up_mcp():
             "url": f"http://127.0.0.1:{mcp_proxy_port}/mcp/"
         }
     })
-    return client
+    return client, registered_tool_names
 
 
 async def run_experiment(algo: ToolRagAlgorithm,
