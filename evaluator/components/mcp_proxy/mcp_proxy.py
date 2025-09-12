@@ -264,7 +264,6 @@ async def run_mcp_proxy(tool_dicts, mcp_port=9000, server_name="General", mirror
     if run_detached:
         threading.Thread(target=lambda: mcp.run(transport="streamable-http"), daemon=True).start()
         await asyncio.sleep(2)  # Give server time to start
-        return registered_tool_names
     else:
         return mcp
 
