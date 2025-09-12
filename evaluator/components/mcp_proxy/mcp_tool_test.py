@@ -23,7 +23,9 @@ async def main():
 
     # Load example_tools from JSON file
     import json
-    with open("/Users/eoconnor/correct/small-model-experiments/evaluator/components/mcp_proxy/example_tools.json", "r") as f:
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    tools_path = os.path.join(script_dir, "example_tools.json")
+    with open(tools_path, "r") as f:
         example_tools = json.load(f)
 
     # Start MCP server and register proxy tools from the example list

@@ -9,7 +9,6 @@ import json
 from evaluator.eval_spec import DATASET_SETTINGS
 from evaluator.utils.file_downloader import fetch_remote_paths
 from evaluator.utils.tool_logger import log_tool
-from evaluator.components.mcp_proxy.mcp_utils import clean_tool_name
 
 
 def make_mcp_proxy_tool(tool_name, payload_details, base_url="http://localhost:8000"):
@@ -232,11 +231,7 @@ async def run_mcp_proxy(tool_dicts, mcp_port=9000, server_name="General", mirror
         # Try to get category from the first API, fallback to 'General'
         category = api_list[0].get("category_name", "General") if api_list else "General"
         for api_doc in api_list:
-            orig_tool_name = api_doc.get("tool_name")
-            if not orig_tool_name:
-                print(f"Warning: api_doc missing 'tool_name': {api_doc}")
-                continue
-            tool_name = clean_tool_name(orig_tool_name)
+            tool_name = api_doc.get("tool_name")
             payload = {
                 "api_doc": api_doc,
                 "request": {
@@ -271,7 +266,10 @@ async def run_mcp_proxy(tool_dicts, mcp_port=9000, server_name="General", mirror
 if __name__ == "__main__":
     import json
     import asyncio
-    with open("/Users/eoconnor/correct/small-model-experiments/evaluator/components/mcp_proxy/example_tools.json", "r") as f:
+    import os
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    tools_path = os.path.join(script_dir, "example_tools.json")
+    with open(tools_path, "r") as f:
         example_tools = json.load(f)
     mcp = asyncio.run(run_mcp_proxy(example_tools))
     # Now run the server synchronously (no nested event loop)
