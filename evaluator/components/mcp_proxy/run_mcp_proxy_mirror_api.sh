@@ -3,24 +3,6 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$SCRIPT_DIR/../../.."
-TOOLS_DIR="$SCRIPT_DIR/toolenv2404_filtered"
-TOOLS_TAR="$SCRIPT_DIR/toolenv2404_filtered.tar.gz"
-TOOLS_URL="https://huggingface.co/datasets/stabletoolbench/ToolEnv2404/resolve/main/toolenv2404_filtered.tar.gz"
-
-if [ ! -d "$TOOLS_DIR" ]; then
-    echo "toolenv2404_filtered directory not found."
-    if [ ! -f "$TOOLS_TAR" ]; then
-        echo "Downloading toolenv2404_filtered.tar.gz from HuggingFace..."
-        curl -L -o "$TOOLS_TAR" "$TOOLS_URL"
-    else
-        echo "Found $TOOLS_TAR, skipping download."
-    fi
-    echo "Unpacking $TOOLS_TAR ..."
-    tar -xzf "$TOOLS_TAR" -C "$SCRIPT_DIR"
-    echo "Unpacked toolenv2404_filtered."
-else
-    echo "toolenv2404_filtered directory already exists."
-fi
 
 # Set MirrorAPI service URL from environment variable
 if [ -z "$MIRROR_API_URL" ]; then

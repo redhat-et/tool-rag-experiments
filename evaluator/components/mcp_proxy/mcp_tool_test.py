@@ -2,7 +2,7 @@ import asyncio
 import sys
 import os
 sys.path.append('/Users/eoconnor/small-model-experiments')
-from mcp_proxy import register_tools_from_dir
+from mcp_proxy import run_mcp_proxy
 from mcp.server.fastmcp import FastMCP
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph.prebuilt import create_react_agent
@@ -20,12 +20,16 @@ BASE_URL = "http://localhost:11434"  # or your LLM base URL
 async def main():
     # Get MirrorAPI URL from environment variable or use default
     mirror_api_url = os.getenv("MIRROR_API_BASE_URL", "http://localhost:8000")
-    
-    # Start MCP server and register tools from the first category (n=10)
-    mcp = FastMCP("General", port=9000)
-    register_tools_from_dir(mcp, ["toolenv2404_filtered"], base_url=mirror_api_url)
-    # Start the MCP server in the background (for demo, in production run separately)
+
+    # Load example_tools from JSON file
+    import json
+    with open("/Users/eoconnor/correct/small-model-experiments/evaluator/components/mcp_proxy/example_tools.json", "r") as f:
+        example_tools = json.load(f)
+
+    # Start MCP server and register proxy tools from the example list
     import threading
+    import asyncio
+    mcp = await run_mcp_proxy(example_tools, mcp_port=9000, server_name="General", mirror_api_base_url=mirror_api_url, run_detached=False)
     threading.Thread(target=lambda: mcp.run(transport="streamable-http"), daemon=True).start()
     await asyncio.sleep(2)  # Give server time to start
 
