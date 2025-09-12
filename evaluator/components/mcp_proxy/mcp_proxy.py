@@ -208,30 +208,69 @@ def check_mirror_api_health(base_url="http://localhost:8000", timeout=5):
     return False
 
 
-async def run_mcp_proxy(run_detached=False):
-    mirror_api_url = os.getenv("MIRROR_API_BASE_URL", "http://localhost:8000")
-    mcp_port = int(os.getenv("MCP_PROXY_LOCAL_PORT", 9000))
-    root_dataset_path = os.getenv("ROOT_DATASET_PATH")
-    
-    # Check if MirrorAPI is running
-    if not check_mirror_api_health(mirror_api_url):
-        print("Exiting due to MirrorAPI connectivity issues.")
-        exit(1)
+async def run_mcp_proxy(tool_dicts, mcp_port=9000, server_name="General", mirror_api_base_url=None, run_detached=False):
+    """
+    Set up an MCP server and register proxy tools from a list of tool dictionaries, connecting to MirrorAPI.
+    Args:
+        tool_dicts: List[dict], each dict should have an 'api_list' key (list of API specs)
+        mcp_port: Port for the MCP server (default: 9000)
+        server_name: Name for the MCP server (default: 'General')
+        mirror_api_base_url: Base URL for the MirrorAPI service (default: env MIRROR_API_BASE_URL or http://localhost:8000)
+        run_detached: If True, run the server in a background thread
+    Returns:
+        If run_detached: List[str] of registered tool names
+        Else: The MCP server instance (to be run synchronously)
+    """
+    if mirror_api_base_url is None:
+        mirror_api_base_url = os.getenv("MIRROR_API_BASE_URL", "http://localhost:8000")
+    mcp = FastMCP(server_name, port=mcp_port)
+    registered_tool_names = []
 
-    mcp, registered_tool_names = setup_mcp_server_with_tools(
-        mcp_port=mcp_port,
-        mirror_api_base_url=mirror_api_url,
-        root_dataset_path=root_dataset_path
-    )
+    for tool_dict in tool_dicts:
+        api_list = tool_dict.get("api_list", [])
+        # Try to get category from the first API, fallback to 'General'
+        category = api_list[0].get("category_name", "General") if api_list else "General"
+        for api_doc in api_list:
+            tool_name = api_doc.get("tool_name")
+            payload = {
+                "api_doc": api_doc,
+                "request": {
+                    "category": category,
+                    "tool_name": tool_name,
+                    "api_name": api_doc.get("api_name", tool_name),
+                    "tool_input": "{}",
+                    "strip": "filter"
+                },
+                "mode": "sft"
+            }
+            tool_func = make_mcp_proxy_tool(tool_name, payload, mirror_api_base_url)
+            mcp.tool(tool_name)(tool_func) # (tool_func) can be removed , left here for testing mirrorapi responses
+            print(f"Registered proxy tool: {tool_name}")
+            registered_tool_names.append(tool_name)
+
+    print(f"\nSummary: Registered {len(registered_tool_names)} proxy tools:")
+    for t in registered_tool_names:
+        print(f"- {t}")
+
+    print(f"MCP server '{server_name}' configured on port {mcp_port}")
+    print(f"MirrorAPI base URL: {mirror_api_base_url}")
 
     print(f"Starting the MCP server...")
     if run_detached:
         threading.Thread(target=lambda: mcp.run(transport="streamable-http"), daemon=True).start()
         await asyncio.sleep(2)  # Give server time to start
-        return registered_tool_names
     else:
-        mcp.run(transport="streamable-http")
+        return mcp
 
 
 if __name__ == "__main__":
-    asyncio.run(run_mcp_proxy())
+    import json
+    import asyncio
+    import os
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    tools_path = os.path.join(script_dir, "example_tools.json")
+    with open(tools_path, "r") as f:
+        example_tools = json.load(f)
+    mcp = asyncio.run(run_mcp_proxy(example_tools))
+    # Now run the server synchronously (no nested event loop)
+    mcp.run(transport="streamable-http")
