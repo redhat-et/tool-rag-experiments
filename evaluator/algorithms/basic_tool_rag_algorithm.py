@@ -9,6 +9,7 @@ from langchain_core.tools import BaseTool
 from langgraph.prebuilt import create_react_agent
 from pymilvus import connections, utility
 
+from evaluator.components.data_provider import QuerySpecification
 from evaluator.utils.module_extractor import register_tool_rag_algorithm
 from evaluator.interfaces.tool_rag_algorithm import ToolRagAlgorithm
 
@@ -78,16 +79,16 @@ class BasicToolRagAlgorithm(ToolRagAlgorithm):
         self.model = model
         self.vector_store = self.__get_or_index_tools(tools)
 
-    async def process_query(self, query: str):
+    async def process_query(self, query_spec: QuerySpecification):
         if not self.vector_store:
             raise RuntimeError("process_query called before set_up")
 
         top_k = self._settings.get("top_k", DEFAULT_TOOL_SELECTION_K)
-        relevant_tool_defs = self.vector_store.similarity_search(query, k=top_k)
+        relevant_tool_defs = self.vector_store.similarity_search(query_spec.query, k=top_k)
         relevant_tools = [BasicToolRagAlgorithm.__doc_to_tool(d) for d in relevant_tool_defs]
 
         agent = create_react_agent(self.model, relevant_tools)
-        return await agent.ainvoke({"messages": query})
+        return await agent.ainvoke({"messages": query_spec.query})
 
     def tear_down(self):
         connections.disconnect(alias=MILVUS_CONNECTION_ALIAS)

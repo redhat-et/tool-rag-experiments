@@ -3,6 +3,7 @@ import os
 import requests
 from typing import Dict, List, Any
 
+from evaluator.components.data_provider import QuerySpecification
 from evaluator.interfaces.metric_collector import MetricCollector
 from evaluator.utils.module_extractor import register_metric_collector
 
@@ -97,13 +98,15 @@ xxx
         """Initialize the FAC metric collector."""
         super().set_up()
 
-    def prepare_for_measurement(self, query: str) -> None:
+    def prepare_for_measurement(self, query_spec: QuerySpecification) -> None:
         """Prepare for measuring a single query."""
         pass
 
-    def register_measurement(self, query: str, response: Any = None, correct_tool: str = None) -> None:
+    def register_measurement(self, query_spec: QuerySpecification, response: Any = None, **kwargs) -> None:
         """Register measurement for a single query."""
         try:
+            query = query_spec.query
+
             # Extract final answer from algorithm response
             final_answer = self.extract_final_answer_from_response(response)
             

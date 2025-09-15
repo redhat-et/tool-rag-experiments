@@ -2,6 +2,7 @@ import os
 import time
 from typing import Dict, List, Any
 
+from evaluator.components.data_provider import QuerySpecification
 from evaluator.interfaces.metric_collector import MetricCollector
 from evaluator.utils.module_extractor import register_metric_collector
 from evaluator.utils.tool_logger import ToolLogger
@@ -43,13 +44,16 @@ class BasicMetricCollector(MetricCollector):
 
         self.tool_logger = ToolLogger(os.getenv("TOOL_LOG_PATH"))
 
-    def prepare_for_measurement(self, query: str) -> None:
+    def prepare_for_measurement(self, query_spec: QuerySpecification) -> None:
         self.start_time = time.time()
 
-    def register_measurement(self, query: str, **kwargs) -> None:
-        if "correct_tool" not in kwargs:
-            raise ValueError(f"Parameter 'correct_tool' was not provided to {self.get_name()}")
-        correct_tool = kwargs["correct_tool"]
+    def register_measurement(self, query_spec: QuerySpecification, **kwargs) -> None:
+        if not query_spec.golden_tools:
+            print(f"{self.get_name()}: No golden tools specified, skipping this query.")
+            return
+
+        # if there are multiple tools in this set, only one will be considered here
+        correct_tool = list(query_spec.golden_tools.keys())[0]
 
         end_time = time.time()
         response_time = end_time - self.start_time

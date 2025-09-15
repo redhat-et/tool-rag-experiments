@@ -4,6 +4,8 @@ from typing import Dict, Any, ClassVar, List
 from langchain_core.language_models import BaseChatModel
 from langchain_core.tools import BaseTool
 
+from evaluator.components.data_provider import QuerySpecification
+
 
 class ToolRagAlgorithm(ABC):
     __algo_name__: ClassVar[str | None] = None
@@ -23,7 +25,7 @@ class ToolRagAlgorithm(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    async def process_query(self, query: str) -> dict[str, Any]:
+    async def process_query(self, query_spec: QuerySpecification) -> dict[str, Any]:
         raise NotImplementedError()
 
     @abstractmethod

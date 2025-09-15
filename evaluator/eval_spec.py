@@ -1,6 +1,6 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 
-from evaluator.utils.module_extractor import Spec
+Spec = Tuple[str, Dict[str, Any]]
 
 EVALUATED_ALGORITHMS: List[Spec] = [
     ("no_tool_rag_baseline", {}),
@@ -30,16 +30,15 @@ DATASET_SETTINGS: Dict[str, Any] = {
         "https://huggingface.co/datasets/stabletoolbench/ToolEnv2404/resolve/main/toolenv2404_filtered.tar.gz",
     ],
 
-    # Tool categories (according to the ToolBench dataset specification) to include in the evaluation.
-    # Set this to None to include all categories.
-    "tool_categories": ["Weather"],
+    # The number of queries to include in the evaluation.
+    "queries_num": 5,
 
-    # The maximal number of tools to include in the evaluation.
-    # The actual number will be smaller than this value if the selected categories do not contain enough tools.
-    "max_tools_num": 10,
-
-    # The maximal number of queries to include in the evaluation.
-    # The actual number will be smaller than this value if not enough queries in the dataset
-    # use the tools selected for evaluation.
-    "max_queries_num": 10,
+    # The ratio of relevant to irrelevant tools in the prompt that uses no tool RAG.
+    # For instance:
+    # - if this value is 0.0, the prompt will only include the correct tools with no irrelevant ones
+    # - if this value is 1.0, the prompt will include one irrelevant tool for each relevant tools, i.e., the total
+    #   number of tools will be double the number of the correct tools
+    # - if this value is 0.5, the prompt will include one irrelevant tool for each two relevant tools (rounding up)
+    # Negative values are not allowed.
+    "irrelevant_tools_ratio": 0.0,
 }
