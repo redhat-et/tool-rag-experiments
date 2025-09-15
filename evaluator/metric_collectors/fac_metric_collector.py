@@ -144,6 +144,8 @@ xxx
                 for field in ['answer', 'output', 'result', 'response', 'content']:
                     if field in response:
                         return str(response[field]).strip()
+                if 'messages' in response:
+                    return response["messages"][-1].content
                 
                 # If no common field, return the whole dict as string
                 return str(response)

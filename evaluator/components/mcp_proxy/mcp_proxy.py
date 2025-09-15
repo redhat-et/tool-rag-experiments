@@ -10,18 +10,29 @@ from evaluator.components.data_provider import ToolSet
 from evaluator.utils.tool_logger import log_tool
 
 
-def make_mcp_proxy_tool(tool_name, payload_details, base_url="http://localhost:8000"):
+def make_mcp_proxy_tool(tool_name, tool_dict, base_url="http://localhost:8000"):
     """
     Returns a function that can be registered as an MCP tool.
     - tool_name: Name of the tool (string)
-    - payload_details: Dict with the payload to send to /predict (should include api_doc, request, mode, etc.)
+    - tool_dict: Dict with the information needed to construct the payload to send to /predict
     - base_url: Base URL for the MirrorAPI service (default: http://localhost:8000)
     """
-    def tool_func():
+    def tool_func(**kwargs):
         predict_url = f"{base_url.rstrip('/')}/predict"
-        resp = requests.post(predict_url, json=payload_details)
+        payload = {
+            "api_doc": tool_dict,
+            "request": {
+                "category": tool_dict.get("category_name"),
+                "tool_name": tool_dict.get("tool_name"),
+                "api_name": tool_dict.get("api_name"),
+                "tool_input": str(kwargs),
+                "strip": "filter"
+            },
+            "mode": "sft"
+        }
+        resp = requests.post(predict_url, json=payload)
         return resp.json()
-    tool_func.__name__ = tool_name
+
     return log_tool(tool_name)(tool_func)
 
 
@@ -50,7 +61,7 @@ def check_mirror_api_health(base_url="http://localhost:8000", timeout=5):
     return False
 
 
-async def run_mcp_proxy(tools: ToolSet, mcp_port=9000, server_name="General", mirror_api_base_url=None, run_detached=False):
+async def run_mcp_proxy(tools: ToolSet, run_detached=False):
     """
     Set up an MCP server and register proxy tools from a list of tool dictionaries, connecting to MirrorAPI.
     Args:
@@ -63,25 +74,14 @@ async def run_mcp_proxy(tools: ToolSet, mcp_port=9000, server_name="General", mi
         If run_detached: List[str] of registered tool names
         Else: The MCP server instance (to be run synchronously)
     """
-    if mirror_api_base_url is None:
-        mirror_api_base_url = os.getenv("MIRROR_API_BASE_URL", "http://localhost:8000")
-    mcp = FastMCP(server_name, port=mcp_port)
+    mirror_api_base_url = os.getenv("MIRROR_API_BASE_URL", "http://localhost:8000")
+    mcp_port = int(os.getenv("MCP_PROXY_LOCAL_PORT", 9000))
+    mcp = FastMCP("General", port=mcp_port)
     registered_tool_names = []
 
     for tool_mcp_name, tool_dict in tools.items():
-        payload = {
-            "api_doc": tool_dict,
-            "request": {
-                "category": tool_dict.get("category_name"),
-                "tool_name": tool_dict.get("tool_name"),
-                "api_name": tool_dict.get("api_name"),
-                "tool_input": "{}",
-                "strip": "filter"
-            },
-            "mode": "sft"
-        }
-        tool_func = make_mcp_proxy_tool(tool_mcp_name, payload, mirror_api_base_url)
-        mcp.tool(tool_mcp_name)(tool_func) # (tool_func) can be removed , left here for testing mirrorapi responses
+        tool_func = make_mcp_proxy_tool(tool_mcp_name, tool_dict, mirror_api_base_url)
+        mcp.tool(name=tool_mcp_name, description=tool_dict.get("api_description"))(tool_func)
         print(f"Registered proxy tool: {tool_mcp_name}")
         registered_tool_names.append(tool_mcp_name)
 
@@ -89,7 +89,7 @@ async def run_mcp_proxy(tools: ToolSet, mcp_port=9000, server_name="General", mi
     for t in registered_tool_names:
         print(f"- {t}")
 
-    print(f"MCP server '{server_name}' configured on port {mcp_port}")
+    print(f"MCP server configured on port {mcp_port}")
     print(f"MirrorAPI base URL: {mirror_api_base_url}")
 
     print(f"Starting the MCP server...")
