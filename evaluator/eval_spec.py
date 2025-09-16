@@ -2,6 +2,8 @@ from typing import List, Dict, Any, Tuple
 
 Spec = Tuple[str, Dict[str, Any]]
 
+VERBOSE = True
+
 EVALUATED_ALGORITHMS: List[Spec] = [
     ("no_tool_rag_baseline", {}),
     #("basic_tool_rag", {"top_k": 3}),
@@ -9,9 +11,7 @@ EVALUATED_ALGORITHMS: List[Spec] = [
 
 METRIC_COLLECTORS: List[Spec] = [
     ("basic_metric_collector", {}),
-    ("fac_metric_collector", {
-        "verbose": True  # True for detailed output, False for minimal output
-    }),
+    ("fac_metric_collector", {}),
 ]
 
 DATASET_SETTINGS: Dict[str, Any] = {

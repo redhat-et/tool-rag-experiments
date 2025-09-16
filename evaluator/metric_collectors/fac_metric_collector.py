@@ -6,6 +6,7 @@ from typing import Dict, List, Any
 from evaluator.components.data_provider import QuerySpecification
 from evaluator.interfaces.metric_collector import MetricCollector
 from evaluator.utils.module_extractor import register_metric_collector
+from evaluator.utils.utils import print_verbose
 
 
 @register_metric_collector("fac_metric_collector")
@@ -85,9 +86,6 @@ xxx
         self.judge_model_url = os.getenv('JUDGE_MODEL_URL')
         if not self.judge_model_url:
             raise ValueError("JUDGE_MODEL_URL environment variable is required")
-        
-        # Configuration options
-        self.verbose = settings.get('verbose', True)
 
     def get_collected_metrics_names(self) -> List[str]:
         return [
@@ -118,10 +116,9 @@ xxx
             # Always store only the boolean for memory efficiency
             self.query_results.append(evaluation_result["is_solved"])
             
-            if self.verbose:
-                print(f"📊 FAC Query Evaluated: {query[:50]}... {status_emoji}")
-                # Show detailed judge model output
-                self.log_judge_output(query, final_answer, evaluation_result["evaluation"], evaluation_result["is_solved"])
+            print_verbose(f"📊 FAC Query Evaluated: {query[:50]}... {status_emoji}")
+            # Show detailed judge model output
+            self.log_judge_output(query, final_answer, evaluation_result["evaluation"])
             
         except Exception as e:
             # Store False for failed evaluations
@@ -252,18 +249,19 @@ xxx
             print(f"❌ Error parsing evaluation result: {e}")
             return False
 
-    def log_judge_output(self, query: str, answer: str, evaluation: str, is_solved: bool):
+    @staticmethod
+    def log_judge_output(query: str, answer: str, evaluation: str):
         """Log detailed judge model output and explanation."""
-        print(f"\n{'='*60}")
-        print(f"🔍 JUDGE MODEL EVALUATION")
-        print(f"{'='*60}")
+        print_verbose(f"\n{'='*60}")
+        print_verbose(f"🔍 JUDGE MODEL EVALUATION")
+        print_verbose(f"{'='*60}")
         
-        print(f"📝 Query: {query}")
-        print(f"💬 Agent's Answer: {answer}")
-        print(f"\n📋 Judge Model Output:")
-        print(f"{'-'*40}")
-        print(evaluation)
-        print(f"{'-'*40}")
+        print_verbose(f"📝 Query: {query}")
+        print_verbose(f"💬 Agent's Answer: {answer}")
+        print_verbose(f"\n📋 Judge Model Output:")
+        print_verbose(f"{'-'*40}")
+        print_verbose(evaluation)
+        print_verbose(f"{'-'*40}")
 
     def tear_down(self) -> None:
         """Clean up after all measurements."""

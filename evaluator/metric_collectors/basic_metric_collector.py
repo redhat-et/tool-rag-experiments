@@ -1,14 +1,10 @@
-import os
 import time
 from typing import Dict, List, Any
 
 from evaluator.components.data_provider import QuerySpecification
 from evaluator.interfaces.metric_collector import MetricCollector
 from evaluator.utils.module_extractor import register_metric_collector
-from evaluator.utils.tool_logger import ToolLogger
-from dotenv import load_dotenv
-
-load_dotenv()
+from evaluator.utils.utils import print_verbose
 
 
 @register_metric_collector("basic_metric_collector")
@@ -50,7 +46,7 @@ class BasicMetricCollector(MetricCollector):
             raise ValueError(f"{self.get_name()}: Mandatory parameter 'executed_tools' was not provided.")
 
         if not query_spec.golden_tools:
-            print(f"{self.get_name()}: No golden tools specified, skipping this query.")
+            print_verbose(f"{self.get_name()}: No golden tools specified, skipping this query.")
             return
 
         # if there are multiple tools in this set, only one will be considered here
@@ -82,4 +78,7 @@ class BasicMetricCollector(MetricCollector):
                    "Irrelevant Tool Rate": self.irrelevant_tool_count / self.num_queries,
                    "Average Latency (s)": self.total_latency / self.num_queries}
 
+        print(f"Basic tool use metrics:")
+        for key, value in results.items():
+            print(f"{key}: {value}")
         return results

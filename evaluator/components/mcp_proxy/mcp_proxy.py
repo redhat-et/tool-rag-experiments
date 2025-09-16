@@ -14,6 +14,7 @@ from evaluator.utils.tool_logger import log_tool
 from inspect import Signature, Parameter
 from typing import Any, Annotated
 
+from evaluator.utils.utils import print_verbose, print_iterable_verbose
 
 _TYPE_MAP = {
     "STRING": str,
@@ -145,26 +146,24 @@ async def run_mcp_proxy(tools: ToolSet, run_detached=False):
     """
     mirror_api_base_url = os.getenv("MIRROR_API_BASE_URL", "http://localhost:8000")
     mcp_port = int(os.getenv("MCP_PROXY_LOCAL_PORT", 9000))
-    mcp = FastMCP("General", port=mcp_port)
+    mcp_instance = FastMCP("General", port=mcp_port)
     registered_tool_names = []
 
     for tool_mcp_name, tool_dict in tools.items():
-        _register_mcp_proxy_tool(mcp, tool_mcp_name, tool_dict, mirror_api_base_url)
+        _register_mcp_proxy_tool(mcp_instance, tool_mcp_name, tool_dict, mirror_api_base_url)
         registered_tool_names.append(tool_mcp_name)
 
-    print(f"\nSummary: Registered {len(registered_tool_names)} tools:")
-    for t in registered_tool_names:
-        print(f"- {t}")
+    print_iterable_verbose(f"\nSummary: Registered {len(registered_tool_names)} tools:", registered_tool_names)
 
-    print(f"MCP server configured on port {mcp_port}")
-    print(f"MirrorAPI base URL: {mirror_api_base_url}")
+    print_verbose(f"MCP server configured on port {mcp_port}")
+    print_verbose(f"MirrorAPI base URL: {mirror_api_base_url}")
 
     print(f"Starting the MCP server...")
     if run_detached:
-        threading.Thread(target=lambda: mcp.run(transport="streamable-http"), daemon=True).start()
+        threading.Thread(target=lambda: mcp_instance.run(transport="streamable-http"), daemon=True).start()
         await asyncio.sleep(2)  # Give server time to start
     else:
-        return mcp
+        return mcp_instance
 
 
 if __name__ == "__main__":
