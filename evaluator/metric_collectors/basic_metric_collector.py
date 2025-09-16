@@ -42,12 +42,13 @@ class BasicMetricCollector(MetricCollector):
         self.total_latency = 0
         self.num_queries = 0
 
-        self.tool_logger = ToolLogger(os.getenv("TOOL_LOG_PATH"))
-
     def prepare_for_measurement(self, query_spec: QuerySpecification) -> None:
         self.start_time = time.time()
 
     def register_measurement(self, query_spec: QuerySpecification, **kwargs) -> None:
+        if "executed_tools" not in kwargs:
+            raise ValueError(f"{self.get_name()}: Mandatory parameter 'executed_tools' was not provided.")
+
         if not query_spec.golden_tools:
             print(f"{self.get_name()}: No golden tools specified, skipping this query.")
             return
@@ -59,7 +60,7 @@ class BasicMetricCollector(MetricCollector):
         response_time = end_time - self.start_time
         self.total_latency += response_time
 
-        executed_tools = self.tool_logger.get_executed_tools()
+        executed_tools = kwargs["executed_tools"]
         num_correct_tool_used = correct_tool in executed_tools
         self.tool_execution_count += 1 if executed_tools and executed_tools[0] != "unknown" else 0
         self.correct_tool_count += 1 if num_correct_tool_used else 0

@@ -17,6 +17,8 @@ from evaluator.utils.csv_logger import CSVLogger
 from evaluator.components.llm_provider import get_llm
 from dotenv import load_dotenv
 
+from evaluator.utils.tool_logger import ToolLogger
+
 load_dotenv()
 
 """
@@ -91,6 +93,7 @@ async def run_experiment(algo: ToolRagAlgorithm,
                          metric_collectors: List[MetricCollector]
                          ):
 
+    tool_logger = ToolLogger(os.getenv("TOOL_LOG_PATH"))
     algo.set_up(llm, tools)
     for mc in metric_collectors:
         mc.set_up()
@@ -102,9 +105,10 @@ async def run_experiment(algo: ToolRagAlgorithm,
             mc.prepare_for_measurement(query_spec)
 
         response = await algo.process_query(query_spec)
+        executed_tools = tool_logger.get_executed_tools()
 
         for mc in metric_collectors:
-            mc.register_measurement(query_spec, response=response)
+            mc.register_measurement(query_spec, response=response, executed_tools=executed_tools)
 
     algo.tear_down()
     for mc in metric_collectors:
