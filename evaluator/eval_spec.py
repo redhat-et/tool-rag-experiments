@@ -30,7 +30,7 @@ DATASET_SETTINGS: Dict[str, Any] = {
         "https://huggingface.co/datasets/stabletoolbench/ToolEnv2404/resolve/main/toolenv2404_filtered.tar.gz",
     ],
 
-    # The number of queries to include in the evaluation.
+    # The number of queries to include in the evaluation or None to include all available queries.
     "queries_num": 5,
 
     # The ratio of relevant to irrelevant tools in the prompt that uses no tool RAG.
@@ -40,5 +40,9 @@ DATASET_SETTINGS: Dict[str, Any] = {
     #   number of tools will be double the number of the correct tools
     # - if this value is 0.5, the prompt will include one irrelevant tool for each two relevant tools (rounding up)
     # Negative values are not allowed.
-    "irrelevant_tools_ratio": 0.0,
+    "irrelevant_tools_ratio": 1.0,
+
+    # True to fetch irrelevant tools from the same categories as the relevant tools and False to include
+    # fully random tools instead. We expect irrelevant tools from the same categories to confuse the model more.
+    "irrelevant_tools_from_same_categories": True,
 }
