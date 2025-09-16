@@ -1,8 +1,9 @@
 import importlib
 import pkgutil
 import traceback
-from typing import Type, Dict, Tuple, Any, Sequence, List
+from typing import Type, Dict, Any, Sequence, List
 
+from evaluator.eval_spec import Spec
 from evaluator.interfaces.metric_collector import MetricCollector
 from evaluator.interfaces.tool_rag_algorithm import ToolRagAlgorithm
 
@@ -33,10 +34,6 @@ def _import_all_algorithms(package_path: str) -> None:
             # if some modules couldn't be imported, you still have to proceed
             print(f"ERROR importing module {module_name}: {e}")
             traceback.print_exc()
-
-
-# ---- Factory with lazy auto-import ----
-Spec = Tuple[str, Dict[str, Any]]
 
 
 # Tool RAG algorithm factory

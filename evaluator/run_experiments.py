@@ -1,7 +1,7 @@
 import asyncio
 import os
 from pathlib import Path
-from typing import List, Tuple
+from typing import List
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.tools import BaseTool
@@ -9,7 +9,7 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 
 from evaluator.components.mcp_proxy.mcp_proxy import run_mcp_proxy
 from evaluator.interfaces.metric_collector import MetricCollector
-from evaluator.components.query_provider import get_queries
+from evaluator.components.data_provider import get_queries, QuerySpecification, ToolSet, get_tools_from_queries
 from evaluator.utils.module_extractor import create_algorithms, create_metric_collectors
 from evaluator.eval_spec import EVALUATED_ALGORITHMS, METRIC_COLLECTORS, DATASET_SETTINGS
 from evaluator.interfaces.tool_rag_algorithm import ToolRagAlgorithm
@@ -32,8 +32,8 @@ async def run_all_experiments():
 
     # Set up the necessary components for the experiments:
     # - the language model
-    # - the tools to use
     # - the data to evaluate on
+    # - the tools to use
     # - the evaluation metrics to collect and calculate
     # - the algorithms to be evaluated
 
@@ -46,14 +46,14 @@ async def run_all_experiments():
     llm = get_llm(provider_id=provider_id, model_id=model_id, base_url=base_url)
     print("Connection established successfully.")
 
-    print("Retrieving available tool definitions...")
-    mcp_client, tool_names = await set_up_mcp()
-    tools = await mcp_client.get_tools()
-    print(f"Successfully retrieved {len(tools)} tools.")
-
     print("Fetching query dataset...")
-    queries = get_queries(tool_names)
+    queries = get_queries()
     print(f"Successfully loaded {len(queries)} queries.")
+
+    print("Retrieving available tool definitions...")
+    tool_specs = get_tools_from_queries(queries)
+    tools = await set_up_mcp(tool_specs)
+    print(f"Evaluation will proceed with {len(tools)} tools.")
 
     print("Loading metric collectors...")
     metric_collectors = create_metric_collectors(METRIC_COLLECTORS)
@@ -72,8 +72,8 @@ async def run_all_experiments():
             print(f"Experiment {i+1} completed.\n")
 
 
-async def set_up_mcp():
-    registered_tool_names = await run_mcp_proxy(run_detached=True)
+async def set_up_mcp(tools_to_provide: ToolSet) -> List[BaseTool]:
+    await run_mcp_proxy(tools_to_provide, run_detached=True)
     mcp_proxy_port = os.getenv("MCP_PROXY_LOCAL_PORT", 9000)
     client = MultiServerMCPClient({
         "general": {
@@ -81,13 +81,13 @@ async def set_up_mcp():
             "url": f"http://127.0.0.1:{mcp_proxy_port}/mcp/"
         }
     })
-    return client, registered_tool_names
+    return await client.get_tools()
 
 
 async def run_experiment(algo: ToolRagAlgorithm,
                          llm: BaseChatModel,
                          tools: List[BaseTool],
-                         queries: List[Tuple[str, str]],
+                         queries: List[QuerySpecification],
                          metric_collectors: List[MetricCollector]
                          ):
 
@@ -95,16 +95,16 @@ async def run_experiment(algo: ToolRagAlgorithm,
     for mc in metric_collectors:
         mc.set_up()
 
-    for i, (query, correct_tool) in enumerate(queries):
+    for i, query_spec in enumerate(queries):
         print(f"Processing query {i+1} of {len(queries)}...")
 
         for mc in metric_collectors:
-            mc.prepare_for_measurement(query)
+            mc.prepare_for_measurement(query_spec)
 
-        response = await algo.process_query(query)
+        response = await algo.process_query(query_spec)
 
         for mc in metric_collectors:
-            mc.register_measurement(query, response=response, correct_tool=correct_tool)
+            mc.register_measurement(query_spec, response=response)
 
     algo.tear_down()
     for mc in metric_collectors:

@@ -31,7 +31,6 @@ class ToolLogger(object):
 
 
 def log_tool(tool_name):
-    print(f"Logging tool: {tool_name}")
 
     def decorator(func):
         @functools.wraps(func)

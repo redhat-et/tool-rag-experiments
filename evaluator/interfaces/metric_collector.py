@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Dict, ClassVar, List, Any
 
+from evaluator.components.data_provider import QuerySpecification
+
 
 class MetricCollector(ABC):
     __collector_name__: ClassVar[str | None] = None
@@ -25,11 +27,11 @@ class MetricCollector(ABC):
         self.collection_active = True
 
     @abstractmethod
-    def prepare_for_measurement(self, query: str) -> None:
+    def prepare_for_measurement(self, query_spec: QuerySpecification) -> None:
         raise NotImplementedError()
 
     @abstractmethod
-    def register_measurement(self, query: str, **kwargs) -> None:
+    def register_measurement(self, query_spec: QuerySpecification, **kwargs) -> None:
         raise NotImplementedError()
 
     @abstractmethod
