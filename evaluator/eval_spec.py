@@ -2,16 +2,17 @@ from typing import List, Dict, Any, Tuple
 
 Spec = Tuple[str, Dict[str, Any]]
 
+VERBOSE = False
+
 EVALUATED_ALGORITHMS: List[Spec] = [
     ("no_tool_rag_baseline", {}),
     #("basic_tool_rag", {"top_k": 3}),
 ]
 
 METRIC_COLLECTORS: List[Spec] = [
-    ("basic_metric_collector", {}),
-    ("fac_metric_collector", {
-        "verbose": True  # True for detailed output, False for minimal output
-    }),
+    # ("basic_metric_collector", {}),
+    ("fac_metric_collector", {}),
+    ("tool_selection_metric_collector", {}),
 ]
 
 DATASET_SETTINGS: Dict[str, Any] = {
@@ -30,8 +31,8 @@ DATASET_SETTINGS: Dict[str, Any] = {
         "https://huggingface.co/datasets/stabletoolbench/ToolEnv2404/resolve/main/toolenv2404_filtered.tar.gz",
     ],
 
-    # The number of queries to include in the evaluation.
-    "queries_num": 5,
+    # The number of queries to include in the evaluation or None to include all available queries.
+    "queries_num": 25,
 
     # The ratio of relevant to irrelevant tools in the prompt that uses no tool RAG.
     # For instance:
@@ -41,4 +42,8 @@ DATASET_SETTINGS: Dict[str, Any] = {
     # - if this value is 0.5, the prompt will include one irrelevant tool for each two relevant tools (rounding up)
     # Negative values are not allowed.
     "irrelevant_tools_ratio": 0.0,
+
+    # True to fetch irrelevant tools from the same categories as the relevant tools and False to include
+    # fully random tools instead. We expect irrelevant tools from the same categories to confuse the model more.
+    "irrelevant_tools_from_same_categories": True,
 }

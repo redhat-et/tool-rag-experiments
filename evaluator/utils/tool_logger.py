@@ -2,6 +2,8 @@ import functools
 import os
 from typing import List
 
+from evaluator.utils.utils import print_verbose
+
 
 class ToolLogger(object):
     def __init__(self, log_file: str):
@@ -38,7 +40,7 @@ def log_tool(tool_name):
             # Create file if it doesn't exist
             with open(os.getenv("TOOL_LOG_PATH"), "a") as f:
                 f.write(f"[TOOL] {tool_name}\n")
-            print(f"Executing tool {tool_name}")
+            print_verbose(f"Executing tool {tool_name}")
             return func(*args, **kwargs)
         return wrapper
     return decorator

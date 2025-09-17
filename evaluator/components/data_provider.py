@@ -1,5 +1,6 @@
 import itertools
 import json
+import math
 import os
 import random
 from typing import List, Dict, Any, Optional, Tuple
@@ -124,7 +125,7 @@ def _load_tools_from_dir(root_dir: str or Path, categories: List[str], tool_num:
     return tool_dicts
 
 
-def _load_random_tools(categories: List[str], tool_num: int) -> ToolSet:
+def _load_random_tools(categories: List[str] or None, tool_num: int) -> ToolSet:
     """
     Load tool_num random tools from the given categories.
     """
@@ -144,6 +145,12 @@ def _load_random_tools(categories: List[str], tool_num: int) -> ToolSet:
     if not os.path.exists(root_dir):
         raise ValueError(f"ERROR: Directory '{root_dir}' does not exist. Please check the path.")
 
+    if categories is None:
+        # if not given, fetch from all possible categories
+        categories = [
+            name for name in os.listdir(root_dir)
+            if not name.startswith(".") and os.path.isdir(os.path.join(root_dir, name))
+        ]
     loaded_tools = _load_tools_from_dir(root_dir, categories, tool_num)
     return tool_api_list_to_tool_set(loaded_tools)
 
@@ -182,22 +189,27 @@ def _parse_raw_query_tool_definitions(query: Dict[str, Any]) -> Tuple[ToolSet or
     additional_tools = tool_api_list_to_tool_set(additional_tool_apis)
 
     # extract additional irrelevant tools if needed
-    required_number_of_additional_tools = DATASET_SETTINGS["irrelevant_tools_ratio"] * len(golden_tools)
+    required_number_of_additional_tools = math.ceil(DATASET_SETTINGS["irrelevant_tools_ratio"] * len(golden_tools))
+    irrelevant_tools_from_same_categories = DATASET_SETTINGS["irrelevant_tools_from_same_categories"]
     if required_number_of_additional_tools == 0:
         return golden_tools, None
-    if required_number_of_additional_tools <= len(additional_tools):
+    if irrelevant_tools_from_same_categories and required_number_of_additional_tools <= len(additional_tools):
         # only return a subset of additional_tools
         additional_tools = dict(itertools.islice(additional_tools.items(), required_number_of_additional_tools))
         return golden_tools, additional_tools
 
     # if we reached this point, more tools are needed
-    category_names = list(set([tool_api["category_name"] for tool_api in golden_tools.values()]))
-    random_toolset = _load_random_tools(category_names, required_number_of_additional_tools - len(additional_tools))
-    additional_tools.update(random_toolset)
-    return golden_tools, additional_tools
+    if irrelevant_tools_from_same_categories:
+        category_names = list(set([tool_api["category_name"] for tool_api in golden_tools.values()]))
+        random_toolset = _load_random_tools(category_names, required_number_of_additional_tools - len(additional_tools))
+        additional_tools.update(random_toolset)
+        return golden_tools, additional_tools
+
+    random_toolset = _load_random_tools(None, required_number_of_additional_tools)
+    return golden_tools, random_toolset
 
 
-def _load_queries_from_single_file(query_file_path: str or Path) -> List[QuerySpecification]:
+def _load_queries_from_single_file(query_file_path: str or Path, max_queries_num: int or None) -> List[QuerySpecification]:
     with open(query_file_path, 'r') as f:
         data = json.load(f)
 
@@ -211,6 +223,8 @@ def _load_queries_from_single_file(query_file_path: str or Path) -> List[QuerySp
             )
         else:
             print(f"Couldn't extract the tool definitions, skipping this query.")
+        if max_queries_num is not None and len(queries) >= max_queries_num:
+            break
 
     return queries
 
@@ -234,11 +248,9 @@ def get_queries() -> List[QuerySpecification]:
         # Actually load the queries
         queries = []
         for path in local_paths:
-            new_queries = _load_queries_from_single_file(path)
-            if len(queries) + len(new_queries) > DATASET_SETTINGS["queries_num"]:
-                num_new_queries_to_add = DATASET_SETTINGS["queries_num"] - len(queries)
-                queries.extend(new_queries[:num_new_queries_to_add])
-                break
+            remaining_queries = \
+                None if DATASET_SETTINGS["queries_num"] is None else DATASET_SETTINGS["queries_num"] - len(queries)
+            new_queries = _load_queries_from_single_file(path, remaining_queries)
             queries.extend(new_queries)
         return queries
 

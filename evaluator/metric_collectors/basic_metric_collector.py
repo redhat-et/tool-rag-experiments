@@ -1,14 +1,10 @@
-import os
 import time
 from typing import Dict, List, Any
 
 from evaluator.components.data_provider import QuerySpecification
 from evaluator.interfaces.metric_collector import MetricCollector
 from evaluator.utils.module_extractor import register_metric_collector
-from evaluator.utils.tool_logger import ToolLogger
-from dotenv import load_dotenv
-
-load_dotenv()
+from evaluator.utils.utils import print_verbose
 
 
 @register_metric_collector("basic_metric_collector")
@@ -25,7 +21,6 @@ class BasicMetricCollector(MetricCollector):
 
         # Auxiliary fields
         self.start_time = None
-        self.tool_logger = None
 
     def get_collected_metrics_names(self) -> List[str]:
         return ["Tool Execution Rate",
@@ -42,14 +37,15 @@ class BasicMetricCollector(MetricCollector):
         self.total_latency = 0
         self.num_queries = 0
 
-        self.tool_logger = ToolLogger(os.getenv("TOOL_LOG_PATH"))
-
     def prepare_for_measurement(self, query_spec: QuerySpecification) -> None:
         self.start_time = time.time()
 
     def register_measurement(self, query_spec: QuerySpecification, **kwargs) -> None:
+        if "executed_tools" not in kwargs:
+            raise ValueError(f"{self.get_name()}: Mandatory parameter 'executed_tools' was not provided.")
+
         if not query_spec.golden_tools:
-            print(f"{self.get_name()}: No golden tools specified, skipping this query.")
+            print_verbose(f"{self.get_name()}: No golden tools specified, skipping this query.")
             return
 
         # if there are multiple tools in this set, only one will be considered here
@@ -59,7 +55,7 @@ class BasicMetricCollector(MetricCollector):
         response_time = end_time - self.start_time
         self.total_latency += response_time
 
-        executed_tools = self.tool_logger.get_executed_tools()
+        executed_tools = kwargs["executed_tools"]
         num_correct_tool_used = correct_tool in executed_tools
         self.tool_execution_count += 1 if executed_tools and executed_tools[0] != "unknown" else 0
         self.correct_tool_count += 1 if num_correct_tool_used else 0
@@ -81,4 +77,7 @@ class BasicMetricCollector(MetricCollector):
                    "Irrelevant Tool Rate": self.irrelevant_tool_count / self.num_queries,
                    "Average Latency (s)": self.total_latency / self.num_queries}
 
+        print(f"Basic tool use metrics:")
+        for key, value in results.items():
+            print(f"{key}: {value}")
         return results

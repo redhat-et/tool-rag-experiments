@@ -6,6 +6,8 @@ import tarfile
 import zipfile
 from typing import Tuple, List
 
+from evaluator.utils.utils import print_verbose
+
 _ARCHIVE_SUFFIXES = (
     ".tar.gz",
     ".tar.bz2",
@@ -70,7 +72,7 @@ def fetch_remote_path(remote_path: str, local_dir: str | Path) -> Path:
     if not is_archive:
         target_file = local_dir / filename
         if target_file.exists():
-            print(f"Dataset file {target_file} seems to already exist, skipping the dataset download step")
+            print_verbose(f"Dataset file {target_file} seems to already exist, skipping the dataset download step")
             return target_file
         # Download
         try:
@@ -89,7 +91,7 @@ def fetch_remote_path(remote_path: str, local_dir: str | Path) -> Path:
     base_name, _ = _split_archive_basename(filename)
     target_dir = local_dir / base_name
     if target_dir.is_dir():
-        print(f"Dataset directory {target_dir} seems to already exist, skipping the dataset download step")
+        print_verbose(f"Dataset directory {target_dir} seems to already exist, skipping the dataset download step")
         return target_dir
 
     archive_path = local_dir / filename

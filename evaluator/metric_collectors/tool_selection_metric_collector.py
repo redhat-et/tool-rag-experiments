@@ -1,0 +1,117 @@
+from typing import List, Dict, Any
+
+from evaluator.components.data_provider import QuerySpecification
+from evaluator.interfaces.metric_collector import MetricCollector
+from evaluator.utils.module_extractor import register_metric_collector
+from evaluator.utils.utils import print_verbose
+
+
+@register_metric_collector("tool_selection_metric_collector")
+class ToolSelectionMetricCollector(MetricCollector):
+    """
+    Tool Selection Metric Collector validates executed tool sequences against golden sets from the dataset.
+    The comparison is order-independent - the metric collector only cares which tools were called, not the order.
+    """
+    def __init__(self, settings: Dict):
+        super().__init__(settings)
+
+        self.total_queries = None
+        self.exact_matches = None
+        self.precision_sum = None
+        self.recall_sum = None
+        self.f1_sum = None
+
+    def get_collected_metrics_names(self) -> List[str]:
+        return ["Tool Selection Exact Match Rate",
+                "Tool Selection Precision (Average)",
+                "Tool Selection Recall (Average)",
+                "Tool Selection F1 (Average)"]
+
+    def set_up(self) -> None:
+        super().set_up()
+
+        self.total_queries = 0
+        self.exact_matches = 0
+        self.precision_sum = 0.0
+        self.recall_sum = 0.0
+        self.f1_sum = 0.0
+
+    def prepare_for_measurement(self, query_spec: QuerySpecification) -> None:
+        pass
+
+    @staticmethod
+    def _compute_tool_set_metrics(golden_tools: List[str], executed_tools: List[str]) -> Dict[str, Any]:
+        golden_set = set(golden_tools or [])
+        executed_set = set(executed_tools or [])
+
+        # Tools that are both golden AND executed (correct selections)
+        correct_tools = golden_set.intersection(executed_set)
+
+        # Exact match: tool sets are identical (order independent)
+        exact_match = (golden_set == executed_set)
+
+        # Precision: fraction of executed tools that were correct
+        if len(executed_set) > 0:
+            precision = len(correct_tools) / len(executed_set)
+        else:
+            precision = 0.0
+
+        # Recall: fraction of golden tools that were executed
+        if len(golden_set) > 0:
+            recall = len(correct_tools) / len(golden_set)
+        else:
+            recall = 1.0  # Perfect recall if no tools were needed
+
+        # F1 score: harmonic mean of precision and recall
+        if (precision + recall) > 0:
+            f1_score = (2 * precision * recall) / (precision + recall)
+        else:
+            f1_score = 0.0
+
+        return {
+            "exact_match": exact_match,
+            "precision": precision,
+            "recall": recall,
+            "f1": f1_score
+        }
+
+    def register_measurement(self, query_spec: QuerySpecification, **kwargs) -> None:
+        if "executed_tools" not in kwargs:
+            raise ValueError(f"{self.get_name()}: Mandatory parameter 'executed_tools' was not provided.")
+        executed_tool_names = kwargs["executed_tools"]
+
+        if not query_spec.golden_tools:
+            print_verbose(f"{self.get_name()}: No golden tools specified, skipping this query.")
+            return
+        golden_tool_names = list(query_spec.golden_tools.keys())
+
+        print_verbose(f"Golden tools for the query: {golden_tool_names}\nActually executed tools: {executed_tool_names}\n")
+        metrics = self._compute_tool_set_metrics(golden_tool_names, executed_tool_names)
+
+        self.total_queries += 1
+        if metrics["exact_match"]:
+            self.exact_matches += 1
+        self.precision_sum += metrics["precision"]
+        self.recall_sum += metrics["recall"]
+        self.f1_sum += metrics["f1"]
+
+    def tear_down(self) -> None:
+        super().tear_down()
+
+    def report_results(self) -> Dict[str, Any] or None:
+        super().report_results()
+
+        if self.total_queries == 0:
+            raise RuntimeError("No measurements registered, cannot produce results.")
+
+        results = {
+            "Tool Selection Exact Match Rate": self.exact_matches / self.total_queries,
+            "Tool Selection Precision (Average)": self.precision_sum / self.total_queries,
+            "Tool Selection Recall (Average)": self.recall_sum / self.total_queries,
+            "Tool Selection F1 (Average)": self.f1_sum / self.total_queries
+        }
+
+        print(f"Tool selection metrics:")
+        for key, value in results.items():
+            print(f"{key}: {value}")
+        return results

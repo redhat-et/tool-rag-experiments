@@ -18,7 +18,7 @@ class ToolRagAlgorithm(ABC):
         return cls.__algo_name__
 
     def get_unique_id(self) -> str:
-        return f"{self.get_name()}:{self._settings}"
+        return f"{self.get_name()}:{self._settings}" if self._settings else self.get_name()
 
     @abstractmethod
     def set_up(self, model: BaseChatModel, tools: List[BaseTool]) -> None:
