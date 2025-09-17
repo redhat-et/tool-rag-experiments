@@ -85,7 +85,7 @@ class ToolSelectionMetricCollector(MetricCollector):
             return
         golden_tool_names = list(query_spec.golden_tools.keys())
 
-        print(f"Golden tools for the query: {golden_tool_names}\nActually executed tools: {executed_tool_names}\n")
+        print_verbose(f"Golden tools for the query: {golden_tool_names}\nActually executed tools: {executed_tool_names}\n")
         metrics = self._compute_tool_set_metrics(golden_tool_names, executed_tool_names)
 
         self.total_queries += 1

@@ -32,7 +32,7 @@ DATASET_SETTINGS: Dict[str, Any] = {
     ],
 
     # The number of queries to include in the evaluation or None to include all available queries.
-    "queries_num": 5,
+    "queries_num": 25,
 
     # The ratio of relevant to irrelevant tools in the prompt that uses no tool RAG.
     # For instance:
