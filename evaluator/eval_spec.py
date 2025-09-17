@@ -2,7 +2,7 @@ from typing import List, Dict, Any, Tuple
 
 Spec = Tuple[str, Dict[str, Any]]
 
-VERBOSE = True
+VERBOSE = False
 
 EVALUATED_ALGORITHMS: List[Spec] = [
     ("no_tool_rag_baseline", {}),
@@ -10,8 +10,9 @@ EVALUATED_ALGORITHMS: List[Spec] = [
 ]
 
 METRIC_COLLECTORS: List[Spec] = [
-    ("basic_metric_collector", {}),
+    # ("basic_metric_collector", {}),
     ("fac_metric_collector", {}),
+    ("tool_selection_metric_collector", {}),
 ]
 
 DATASET_SETTINGS: Dict[str, Any] = {
@@ -40,7 +41,7 @@ DATASET_SETTINGS: Dict[str, Any] = {
     #   number of tools will be double the number of the correct tools
     # - if this value is 0.5, the prompt will include one irrelevant tool for each two relevant tools (rounding up)
     # Negative values are not allowed.
-    "irrelevant_tools_ratio": 1.0,
+    "irrelevant_tools_ratio": 0.0,
 
     # True to fetch irrelevant tools from the same categories as the relevant tools and False to include
     # fully random tools instead. We expect irrelevant tools from the same categories to confuse the model more.

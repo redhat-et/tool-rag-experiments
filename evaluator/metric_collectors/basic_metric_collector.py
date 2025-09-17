@@ -21,7 +21,6 @@ class BasicMetricCollector(MetricCollector):
 
         # Auxiliary fields
         self.start_time = None
-        self.tool_logger = None
 
     def get_collected_metrics_names(self) -> List[str]:
         return ["Tool Execution Rate",

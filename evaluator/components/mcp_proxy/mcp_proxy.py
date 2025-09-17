@@ -124,8 +124,11 @@ def _register_mcp_proxy_tool(mcp_instance, tool_name, tool_dict, base_url):
             },
             "mode": "sft"
         }
-        resp = requests.post(predict_url, json=payload)
-        return resp.json()
+
+        print_verbose(f"Sending payload to MirrorAPI: {payload}")
+        response = requests.post(predict_url, json=payload).json()
+        print_verbose(f"Tool execution response from MirrorAPI: {response}")
+        return response
 
     final_tool_func = log_tool(tool_name)(tool_func)
     final_tool_func.__signature__ = signature
