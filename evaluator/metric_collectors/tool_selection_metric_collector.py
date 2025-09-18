@@ -101,7 +101,6 @@ class ToolSelectionMetricCollector(MetricCollector):
             "Spurious Use Rate": 1.0 - (self.precision_sum / self.total_queries),
         }
 
-        print(f"Tool selection metrics:")
         for key, value in results.items():
             print(f"{key}: {value:.3f}")
         return results

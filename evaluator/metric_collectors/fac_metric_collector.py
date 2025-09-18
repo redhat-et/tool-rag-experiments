@@ -89,7 +89,7 @@ xxx
 
     def get_collected_metrics_names(self) -> List[str]:
         return [
-            "FAC Solve Rate (%)"
+            "Final Answer Correctness Rate"
         ]
 
     def set_up(self) -> None:
@@ -273,13 +273,12 @@ xxx
         total_queries = len(self.query_results)
         # Count solved queries from our direct evaluations
         solved_queries = sum(1 for is_solved in self.query_results if is_solved)
-        solve_rate = (solved_queries / total_queries) * 100
+        solve_rate = solved_queries / total_queries
         
+        print(f"Final Answer Correctness Rate: {solve_rate:.3f} (Solved {solved_queries}/{total_queries} queries)")
+
         results = {
-            "FAC Solve Rate (%)": solve_rate
+            "Final Answer Correctness Rate": solve_rate
         }
-        
-        print(f"📊 FAC Results: {solve_rate:.1f}% solve rate")
-        print(f"📊 Solved: {solved_queries}/{total_queries} queries")
         
         return results
