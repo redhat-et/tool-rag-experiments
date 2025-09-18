@@ -20,8 +20,8 @@ DATASET_SETTINGS: Dict[str, Any] = {
     # Will only be downloaded if not already available locally.
     "query_files": [
         "https://raw.githubusercontent.com/THUNLP-MT/StableToolBench/refs/heads/master/solvable_queries/test_instruction/G1_category.json",
-        #"https://raw.githubusercontent.com/THUNLP-MT/StableToolBench/refs/heads/master/solvable_queries/test_instruction/G1_instruction.json",
-        #"https://raw.githubusercontent.com/THUNLP-MT/StableToolBench/refs/heads/master/solvable_queries/test_instruction/G1_tool.json",
+        "https://raw.githubusercontent.com/THUNLP-MT/StableToolBench/refs/heads/master/solvable_queries/test_instruction/G1_instruction.json",
+        "https://raw.githubusercontent.com/THUNLP-MT/StableToolBench/refs/heads/master/solvable_queries/test_instruction/G1_tool.json",
     ],
 
     # URLs of the files to fetch the tools from.
@@ -32,7 +32,7 @@ DATASET_SETTINGS: Dict[str, Any] = {
     ],
 
     # The number of queries to include in the evaluation or None to include all available queries.
-    "queries_num": 25,
+    "queries_num": None,
 
     # The ratio of relevant to irrelevant tools in the prompt that uses no tool RAG.
     # For instance:
