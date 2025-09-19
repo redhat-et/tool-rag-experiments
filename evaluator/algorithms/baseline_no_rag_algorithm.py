@@ -43,7 +43,7 @@ class NoToolRagAlgorithm(ToolRagAlgorithm):
         tools = self._filter_relevant_tools(query_spec)
         agent = create_react_agent(self.model, tools)
         print_mode = "debug" if VERBOSE else ()
-        return await agent.ainvoke({"messages": query_spec.query}, print_mode=print_mode)
+        return await agent.ainvoke({"messages": query_spec.query}, max_iterations=6, print_mode=print_mode)
 
     def tear_down(self):
         pass
