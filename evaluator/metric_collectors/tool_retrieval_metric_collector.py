@@ -47,6 +47,8 @@ class ToolRetrievalMetricCollector(MetricCollector):
         return out
 
     def set_up(self) -> None:
+        super().set_up()
+
         self._rows.clear()
         self._num_queries_with_retrieval = 0
 
@@ -94,7 +96,7 @@ class ToolRetrievalMetricCollector(MetricCollector):
         self._rows.append(row)
 
     def tear_down(self) -> None:
-        pass
+        super().tear_down()
 
     def report_results(self) -> Dict[str, Any]:
         super().report_results()

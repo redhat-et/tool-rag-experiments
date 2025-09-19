@@ -10,10 +10,10 @@ EVALUATED_ALGORITHMS: List[Spec] = [
 ]
 
 METRIC_COLLECTORS: List[Spec] = [
-    # ("basic_metric_collector", {}),
     ("fac_metric_collector", {}),
     ("tool_selection_metric_collector", {}),
     ("tool_retrieval_metric_collector", {"ks": [1, 3, 5], "ap_rel_threshold": 1.0}),
+    ("efficiency_metric_collector", {}),
 ]
 
 DATASET_SETTINGS: Dict[str, Any] = {
