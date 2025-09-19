@@ -6,13 +6,14 @@ VERBOSE = False
 
 EVALUATED_ALGORITHMS: List[Spec] = [
     ("no_tool_rag_baseline", {}),
-    #("basic_tool_rag", {"top_k": 3}),
+    #("basic_tool_rag", {"top_k": 5}),
 ]
 
 METRIC_COLLECTORS: List[Spec] = [
     # ("basic_metric_collector", {}),
     ("fac_metric_collector", {}),
     ("tool_selection_metric_collector", {}),
+    #("tool_retrieval_metric_collector", {"ks": [1, 3, 5], "ap_rel_threshold": 1.0}),
 ]
 
 DATASET_SETTINGS: Dict[str, Any] = {
