@@ -10,8 +10,9 @@ from langgraph.prebuilt import create_react_agent
 from pymilvus import connections, utility
 
 from evaluator.components.data_provider import QuerySpecification
+from evaluator.eval_spec import VERBOSE
 from evaluator.utils.module_extractor import register_tool_rag_algorithm
-from evaluator.interfaces.tool_rag_algorithm import ToolRagAlgorithm
+from evaluator.interfaces.tool_rag_algorithm import ToolRagAlgorithm, AlgoResponse
 
 from dotenv import load_dotenv
 
@@ -75,11 +76,11 @@ class BasicToolRagAlgorithm(ToolRagAlgorithm):
             drop_old=True,
         )
 
-    def set_up(self, model: BaseChatModel, tools: List[BaseTool]):
+    def set_up(self, model: BaseChatModel, tools: List[BaseTool]) -> None:
         self.model = model
         self.vector_store = self.__get_or_index_tools(tools)
 
-    async def process_query(self, query_spec: QuerySpecification):
+    async def process_query(self, query_spec: QuerySpecification) -> AlgoResponse:
         if not self.vector_store:
             raise RuntimeError("process_query called before set_up")
 
@@ -88,7 +89,13 @@ class BasicToolRagAlgorithm(ToolRagAlgorithm):
         relevant_tools = [BasicToolRagAlgorithm.__doc_to_tool(d) for d in relevant_tool_defs]
 
         agent = create_react_agent(self.model, relevant_tools)
-        return await agent.ainvoke({"messages": query_spec.query})
+        print_mode = "debug" if VERBOSE else ()
+        response = await agent.ainvoke(
+            input={"messages": query_spec.query},
+            max_iterations=6,
+            print_mode=print_mode
+        )
+        return response, [tool.name for tool in relevant_tools]
 
-    def tear_down(self):
+    def tear_down(self) -> None:
         connections.disconnect(alias=MILVUS_CONNECTION_ALIAS)

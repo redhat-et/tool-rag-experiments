@@ -60,9 +60,9 @@ class ToolRetrievalMetricCollector(MetricCollector):
 
         if "retrieved_tools" not in kwargs:
             raise ValueError(f"{self.get_name()}: Mandatory parameter 'retrieved_tools' was not provided.")
-        retrieved = kwargs["retrieved_tools"]
+        retrieved_tools = kwargs["retrieved_tools"]
 
-        if retrieved is None:
+        if retrieved_tools is None:
             # can happen if we are running the RAG-less baseline
             return
 
@@ -71,14 +71,14 @@ class ToolRetrievalMetricCollector(MetricCollector):
         gold_set = set(executed_tools)
 
         # Build graded relevance list for retrieved items (post)
-        rels_post = [self._grade(r, gold_set) for r in retrieved]
+        rels_post = [self._grade(r, gold_set) for r in retrieved_tools]
 
         # @K metrics
         per_k = {}
         for K in self.ks:
             hit = 1.0 if any(self._is_relevant(x) for x in rels_post[:K]) else 0.0
             recall = self._safe_div(self._count_relevant(rels_post[:K]), len(gold_set))
-            precision = self._safe_div(self._count_relevant(rels_post[:K]), min(K, len(retrieved)))
+            precision = self._safe_div(self._count_relevant(rels_post[:K]), min(K, len(retrieved_tools)))
             ndcg = self._ndcg_at_k(rels_post, K, ideal_rel_count=len(gold_set))
             per_k[K] = {"hit": hit, "recall": recall, "precision": precision, "ndcg": ndcg}
 
