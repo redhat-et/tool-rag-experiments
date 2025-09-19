@@ -112,9 +112,10 @@ async def run_experiment(algo: ToolRagAlgorithm,
 
         try:
             response, retrieved_tools = await algo.process_query(query_spec)
-        except (GraphRecursionError, ValidationError):
+        except (GraphRecursionError, ValidationError) as e:
             # if we hit it, the model obviously failed to adequately address the query
             # TODO: execution errors must be tracked as a separate metric and categorized according to the error type
+            print(f"Exception during query processing: {e}")
             response = "Query execution failed."
             retrieved_tools = None
         executed_tools = tool_logger.get_executed_tools()

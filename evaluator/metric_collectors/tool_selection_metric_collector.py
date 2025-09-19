@@ -22,9 +22,9 @@ class ToolSelectionMetricCollector(MetricCollector):
 
     def get_collected_metrics_names(self) -> List[str]:
         return ["Exact Match Rate",
-                "Recall",
-                "Precision",
-                "Spurious Use Rate"]
+                "Tool Calling Precision",
+                "Tool Calling Recall",
+                "Spurious Tool Calling Rate"]
 
     def set_up(self) -> None:
         super().set_up()
@@ -96,9 +96,9 @@ class ToolSelectionMetricCollector(MetricCollector):
 
         results = {
             "Exact Match Rate": self.exact_matches / self.total_queries,
-            "Recall": self.recall_sum / self.total_queries,
-            "Precision": self.precision_sum / self.total_queries,
-            "Spurious Use Rate": 1.0 - (self.precision_sum / self.total_queries),
+            "Tool Calling Precision": self.precision_sum / self.total_queries,
+            "Tool Calling Recall": self.recall_sum / self.total_queries,
+            "Spurious Tool Calling Rate": 1.0 - (self.precision_sum / self.total_queries),
         }
 
         for key, value in results.items():

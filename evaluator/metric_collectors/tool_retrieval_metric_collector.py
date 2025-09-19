@@ -39,10 +39,10 @@ class ToolRetrievalMetricCollector(MetricCollector):
 
         # Per-K aggregates
         for K in self.ks:
-            out.extend([f"hit_at{K}_rate", f"recall_at{K}_mean", f"precision_at{K}_mean", f"ndcg_at{K}_mean"])
+            out.extend([f"Retrieval Hit@{K}", f"Retrieval Precision@{K}", f"Retrieval Recall@{K}", f"NDCG@{K}"])
 
         # Global aggregates
-        out.extend(["mrr_mean", "map_mean"])
+        out.extend(["Mean MRR", "Mean MAP"])
 
         return out
 
@@ -100,21 +100,26 @@ class ToolRetrievalMetricCollector(MetricCollector):
         if self._num_queries_with_retrieval == 0:
             # the current run is on the baseline without RAG - retrieval metrics are not available
             keys = self.get_collected_metrics_names()
-            return {key: "N/A" for key in keys}
+            out = {key: "N/A" for key in keys}
+            for key in out.keys():
+                print(f"{key}: N/A")
+            return out
 
         out = {}
 
         # Per-K aggregates
         for K in self.ks:
-            out[f"hit_at{K}_rate"] = self._avg_k(lambda r: r["per_k"][K]["hit"])
-            out[f"recall_at{K}_mean"] = self._avg_k(lambda r: r["per_k"][K]["recall"])
-            out[f"precision_at{K}_mean"] = self._avg_k(lambda r: r["per_k"][K]["precision"])
-            out[f"ndcg_at{K}_mean"] = self._avg_k(lambda r: r["per_k"][K]["ndcg"])
+            out[f"Retrieval Hit@{K}"] = self._avg_k(lambda r: r["per_k"][K]["hit"])
+            out[f"Retrieval Precision@{K}"] = self._avg_k(lambda r: r["per_k"][K]["precision"])
+            out[f"Retrieval Recall@{K}"] = self._avg_k(lambda r: r["per_k"][K]["recall"])
+            out[f"NDCG@{K}"] = self._avg_k(lambda r: r["per_k"][K]["ndcg"])
 
         # Global aggregates
-        out["mrr_mean"] = self._avg(lambda r: r["mrr"])
-        out["map_mean"] = self._avg(lambda r: r["ap"])
+        out["Mean MRR"] = self._avg(lambda r: r["mrr"])
+        out["Mean MAP"] = self._avg(lambda r: r["ap"])
 
+        for key, value in out.items():
+            print(f"{key}: {value:.3f}")
         return out
 
     # ---- helpers ----
