@@ -8,6 +8,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.tools import BaseTool
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph.errors import GraphRecursionError
+from pydantic import ValidationError
 
 from evaluator.components.mcp_proxy.mcp_proxy import run_mcp_proxy
 from evaluator.interfaces.metric_collector import MetricCollector
@@ -111,9 +112,9 @@ async def run_experiment(algo: ToolRagAlgorithm,
 
         try:
             response = await algo.process_query(query_spec)
-        except GraphRecursionError:
+        except (GraphRecursionError, ValidationError):
             # if we hit it, the model obviously failed to adequately address the query
-            # TODO: execution errors must be tracked as a separate metric
+            # TODO: execution errors must be tracked as a separate metric and categorized according to the error type
             response = "Query execution failed."
         executed_tools = tool_logger.get_executed_tools()
 
