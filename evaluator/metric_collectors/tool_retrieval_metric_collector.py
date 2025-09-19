@@ -97,6 +97,8 @@ class ToolRetrievalMetricCollector(MetricCollector):
         pass
 
     def report_results(self) -> Dict[str, Any]:
+        super().report_results()
+
         if self._num_queries_with_retrieval == 0:
             # the current run is on the baseline without RAG - retrieval metrics are not available
             keys = self.get_collected_metrics_names()
