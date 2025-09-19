@@ -118,6 +118,10 @@ async def run_experiment(algo: ToolRagAlgorithm,
             print(f"Exception during query processing: {e}")
             response = "Query execution failed."
             retrieved_tools = None
+        except RuntimeError as e:
+            print(f"A critical error occurred: {e}\nEvaluation will now be stopped. Partial results will be reported below.\n")
+            break
+
         executed_tools = tool_logger.get_executed_tools()
 
         for mc in metric_collectors:
