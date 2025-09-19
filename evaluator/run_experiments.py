@@ -1,9 +1,11 @@
 import asyncio
 import logging
 import os
+import time
 from pathlib import Path
 from typing import List
 
+import openai
 from langchain_core.language_models import BaseChatModel
 from langchain_core.tools import BaseTool
 from langchain_mcp_adapters.client import MultiServerMCPClient
@@ -28,6 +30,9 @@ load_dotenv()
 if not VERBOSE:
     # in non-verbose mode we want to suppress the excessive output from MCP server and client
     logging.disable(logging.WARNING)
+
+MAX_RETRIES = 3
+RETRY_DELAY = 5
 
 
 async def run_all_experiments():
@@ -110,17 +115,34 @@ async def run_experiment(algo: ToolRagAlgorithm,
         for mc in metric_collectors:
             mc.prepare_for_measurement(query_spec)
 
-        try:
-            response, retrieved_tools = await algo.process_query(query_spec)
-        except (GraphRecursionError, ValidationError) as e:
-            # if we hit it, the model obviously failed to adequately address the query
-            # TODO: execution errors must be tracked as a separate metric and categorized according to the error type
-            print(f"Exception during query processing: {e}")
-            response = "Query execution failed."
-            retrieved_tools = None
-        except RuntimeError as e:
-            print(f"A critical error occurred: {e}\nEvaluation will now be stopped. Partial results will be reported below.\n")
-            break
+        response = None
+        retrieved_tools = None
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                response, retrieved_tools = await algo.process_query(query_spec)
+                break  # success, go to next query
+            except (GraphRecursionError, ValidationError) as e:
+                # if we hit it, the model obviously failed to adequately address the query
+                # TODO: execution errors must be tracked as a separate metric and categorized according to the error type
+                print(f"Exception while processing query {i+1}: {e}")
+                if attempt < MAX_RETRIES:
+                    print(f"Retrying query {i+1}...")
+                    continue
+                else:
+                    print(f"All {MAX_RETRIES} retried failed, marking query {i+1} as failed.")
+                    response = "Query execution failed."
+                    break
+            except openai.InternalServerError as e:
+                # detect gateway timeout (504) specifically
+                if "504" in str(e) or "Gateway Time-out" in str(e):
+                    print(f"Timeout on query {i+1} (attempt {attempt}/{MAX_RETRIES})")
+                    if attempt < MAX_RETRIES:
+                        time.sleep(RETRY_DELAY)
+                        continue
+                    else:
+                        print(f"All {MAX_RETRIES} retried failed, aborting the experiment.")
+                # it's not a 504, or max retries reached
+                raise
 
         executed_tools = tool_logger.get_executed_tools()
 
