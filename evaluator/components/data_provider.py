@@ -248,9 +248,11 @@ def get_queries() -> List[QuerySpecification]:
         # Actually load the queries
         queries = []
         for path in local_paths:
-            remaining_queries = \
+            remaining_queries_num = \
                 None if DATASET_SETTINGS["queries_num"] is None else DATASET_SETTINGS["queries_num"] - len(queries)
-            new_queries = _load_queries_from_single_file(path, remaining_queries)
+            if remaining_queries_num == 0:
+                break
+            new_queries = _load_queries_from_single_file(path, remaining_queries_num)
             queries.extend(new_queries)
         return queries
 

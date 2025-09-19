@@ -5,6 +5,7 @@ from langchain_core.tools import BaseTool
 from langgraph.prebuilt import create_react_agent
 
 from evaluator.components.data_provider import QuerySpecification
+from evaluator.eval_spec import VERBOSE
 from evaluator.utils.module_extractor import register_tool_rag_algorithm
 from evaluator.interfaces.tool_rag_algorithm import ToolRagAlgorithm
 
@@ -39,8 +40,10 @@ class NoToolRagAlgorithm(ToolRagAlgorithm):
         if not self.all_tools:
             raise RuntimeError("process_query called before set_up")
 
-        agent = create_react_agent(self.model, self._filter_relevant_tools(query_spec))
-        return await agent.ainvoke({"messages": query_spec.query})
+        tools = self._filter_relevant_tools(query_spec)
+        agent = create_react_agent(self.model, tools)
+        print_mode = "debug" if VERBOSE else ()
+        return await agent.ainvoke({"messages": query_spec.query}, print_mode=print_mode)
 
     def tear_down(self):
         pass

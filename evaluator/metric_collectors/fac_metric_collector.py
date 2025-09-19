@@ -1,5 +1,7 @@
 import json
 import os
+import re
+
 import requests
 from typing import Dict, List, Any
 
@@ -8,6 +10,8 @@ from evaluator.interfaces.metric_collector import MetricCollector
 from evaluator.utils.module_extractor import register_metric_collector
 from evaluator.utils.utils import print_verbose
 
+_THINK_BLOCK = re.compile(r"<think\b[^>]*>.*?</think>", re.IGNORECASE | re.DOTALL)
+_UNCLOSED_THINK = re.compile(r"<think\b[^>]*>.*\Z", re.IGNORECASE | re.DOTALL)
 
 @register_metric_collector("fac_metric_collector")
 class FACMetricCollector(MetricCollector):
@@ -89,7 +93,7 @@ xxx
 
     def get_collected_metrics_names(self) -> List[str]:
         return [
-            "Final Answer Correctness Rate"
+            "Final Answer Correctness Rate (%)"
         ]
 
     def set_up(self) -> None:
@@ -107,6 +111,7 @@ xxx
 
             # Extract final answer from algorithm response
             final_answer = self.extract_final_answer_from_response(response)
+            final_answer = self.strip_think(final_answer)
             
             # Evaluate using LLM judge model
             evaluation_result = self.evaluate_with_llm_judge(query, final_answer)
@@ -124,7 +129,8 @@ xxx
             # Store False for failed evaluations
             self.query_results.append(False)
 
-    def extract_final_answer_from_response(self, response: Any) -> str:
+    @staticmethod
+    def extract_final_answer_from_response(response: Any) -> str:
         """Extract final answer from algorithm response."""
         try:
             # Handle different response types from algorithms
@@ -154,6 +160,18 @@ xxx
             print(f"❌ Error extracting final answer: {e}")
             print(f"🔍 Faulty response: {response}")
             return str(response) if response else ""
+
+    @staticmethod
+    def strip_think(text: str) -> str:
+        """Remove <think>...</think> blocks from free text."""
+        if not text:
+            return text
+        out = _THINK_BLOCK.sub("", text)  # remove well-formed blocks
+        out = _UNCLOSED_THINK.sub("", out)  # guard: remove tail after an unclosed <think>
+        # collapse excessive blank lines/spaces created by removals
+        out = re.sub(r"[ \t]+\n", "\n", out)
+        out = re.sub(r"\n{3,}", "\n\n", out).strip()
+        return out
 
     def evaluate_with_llm_judge(self, query: str, answer: str) -> Dict[str, Any]:
         """Evaluate query-answer pair using LLM judge model."""
@@ -229,7 +247,8 @@ xxx
                 "is_solved": False
             }
 
-    def parse_evaluation_result(self, evaluation_text: str) -> bool:
+    @staticmethod
+    def parse_evaluation_result(evaluation_text: str) -> bool:
         """Parse evaluation text to determine if the query was solved."""
         try:
             # Convert to lowercase for case-insensitive matching
@@ -273,12 +292,12 @@ xxx
         total_queries = len(self.query_results)
         # Count solved queries from our direct evaluations
         solved_queries = sum(1 for is_solved in self.query_results if is_solved)
-        solve_rate = solved_queries / total_queries
+        solve_rate = (solved_queries / total_queries) * 100
         
-        print(f"Final Answer Correctness Rate: {solve_rate:.3f} (Solved {solved_queries}/{total_queries} queries)")
+        print(f"Final Answer Correctness Rate: {solve_rate:.1f}% (Solved {solved_queries}/{total_queries} queries)")
 
         results = {
-            "Final Answer Correctness Rate": solve_rate
+            "Final Answer Correctness Rate (%)": solve_rate
         }
         
         return results
