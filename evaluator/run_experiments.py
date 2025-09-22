@@ -32,7 +32,7 @@ if not VERBOSE:
     logging.disable(logging.WARNING)
 
 MAX_RETRIES = 3
-RETRY_DELAY = 5
+RETRY_DELAY = 20
 
 
 async def run_all_experiments():
@@ -121,7 +121,7 @@ async def run_experiment(algo: ToolRagAlgorithm,
             try:
                 response, retrieved_tools = await algo.process_query(query_spec)
                 break  # success, go to next query
-            except (GraphRecursionError, ValidationError) as e:
+            except (GraphRecursionError, ValidationError, openai.BadRequestError) as e:
                 # if we hit it, the model obviously failed to adequately address the query
                 # TODO: execution errors must be tracked as a separate metric and categorized according to the error type
                 print(f"Exception while processing query {i+1}: {e}")
@@ -130,7 +130,7 @@ async def run_experiment(algo: ToolRagAlgorithm,
                     continue
                 else:
                     print(f"All {MAX_RETRIES} retried failed, marking query {i+1} as failed.")
-                    response = "Query execution failed."
+                    response = {"response": "Query execution failed."}
                     break
             except openai.InternalServerError as e:
                 # detect gateway timeout (504) specifically

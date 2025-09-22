@@ -1,6 +1,7 @@
 import time
 from typing import Any, Dict, List
 
+from evaluator.components.data_provider import QuerySpecification
 from evaluator.interfaces.metric_collector import MetricCollector
 from evaluator.utils.module_extractor import register_metric_collector
 
@@ -36,10 +37,10 @@ class EfficiencyMetricCollector(MetricCollector):
         self._n_queries = 0
         self._total_latency = 0
 
-    def prepare_for_measurement(self, query: str) -> None:
+    def prepare_for_measurement(self, query_spec: QuerySpecification) -> None:
         self.start_time = time.time()
 
-    def register_measurement(self, query: str, **kwargs) -> None:
+    def register_measurement(self, query_spec: QuerySpecification, **kwargs) -> None:
         self._n_queries += 1
 
         end_time = time.time()

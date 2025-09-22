@@ -1,6 +1,5 @@
 import json
 import os
-import re
 
 import requests
 from typing import Dict, List, Any
@@ -8,10 +7,8 @@ from typing import Dict, List, Any
 from evaluator.components.data_provider import QuerySpecification
 from evaluator.interfaces.metric_collector import MetricCollector
 from evaluator.utils.module_extractor import register_metric_collector
-from evaluator.utils.utils import print_verbose
+from evaluator.utils.utils import print_verbose, extract_final_answer_from_response, strip_think
 
-_THINK_BLOCK = re.compile(r"<think\b[^>]*>.*?</think>", re.IGNORECASE | re.DOTALL)
-_UNCLOSED_THINK = re.compile(r"<think\b[^>]*>.*\Z", re.IGNORECASE | re.DOTALL)
 
 @register_metric_collector("fac_metric_collector")
 class FACMetricCollector(MetricCollector):
@@ -87,9 +84,9 @@ xxx
         self.query_results = []
         
         # judge model configuration
-        self.judge_model_url = os.getenv('JUDGE_MODEL_URL')
+        self.judge_model_url = os.getenv('FAC_JUDGE_MODEL_URL')
         if not self.judge_model_url:
-            raise ValueError("JUDGE_MODEL_URL environment variable is required")
+            raise ValueError("FAC_JUDGE_MODEL_URL environment variable is required")
 
     def get_collected_metrics_names(self) -> List[str]:
         return [
@@ -110,8 +107,8 @@ xxx
             query = query_spec.query
 
             # Extract final answer from algorithm response
-            final_answer = self.extract_final_answer_from_response(response)
-            final_answer = self.strip_think(final_answer)
+            final_answer = extract_final_answer_from_response(response)
+            final_answer = strip_think(final_answer)
             
             # Evaluate using LLM judge model
             evaluation_result = self.evaluate_with_llm_judge(query, final_answer)
@@ -128,50 +125,6 @@ xxx
         except Exception as e:
             # Store False for failed evaluations
             self.query_results.append(False)
-
-    @staticmethod
-    def extract_final_answer_from_response(response: Any) -> str:
-        """Extract final answer from algorithm response."""
-        try:
-            # Handle different response types from algorithms
-            if response is None:
-                return ""
-            
-            # If it's a string, return it directly
-            if isinstance(response, str):
-                return response.strip()
-            
-            # If it's a dict, look for common answer fields
-            if isinstance(response, dict):
-                # Try common answer field names
-                for field in ['answer', 'output', 'result', 'response', 'content']:
-                    if field in response:
-                        return str(response[field]).strip()
-                if 'messages' in response:
-                    return response["messages"][-1].content
-                
-                # If no common field, return the whole dict as string
-                return str(response)
-            
-            # For other types, convert to string
-            return str(response).strip()
-                
-        except Exception as e:
-            print(f"❌ Error extracting final answer: {e}")
-            print(f"🔍 Faulty response: {response}")
-            return str(response) if response else ""
-
-    @staticmethod
-    def strip_think(text: str) -> str:
-        """Remove <think>...</think> blocks from free text."""
-        if not text:
-            return text
-        out = _THINK_BLOCK.sub("", text)  # remove well-formed blocks
-        out = _UNCLOSED_THINK.sub("", out)  # guard: remove tail after an unclosed <think>
-        # collapse excessive blank lines/spaces created by removals
-        out = re.sub(r"[ \t]+\n", "\n", out)
-        out = re.sub(r"\n{3,}", "\n\n", out).strip()
-        return out
 
     def evaluate_with_llm_judge(self, query: str, answer: str) -> Dict[str, Any]:
         """Evaluate query-answer pair using LLM judge model."""

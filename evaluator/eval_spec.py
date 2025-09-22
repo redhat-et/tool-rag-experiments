@@ -14,6 +14,7 @@ METRIC_COLLECTORS: List[Spec] = [
     ("tool_selection_metric_collector", {}),
     ("tool_retrieval_metric_collector", {"ks": [1, 3, 5], "ap_rel_threshold": 1.0}),
     ("efficiency_metric_collector", {}),
+    #("answer_quality_metric_collector", {"task_success_with_ref": "AtlaAI/Selene-1-Mini-Llama-3.1-8B"}),
 ]
 
 DATASET_SETTINGS: Dict[str, Any] = {
@@ -31,6 +32,12 @@ DATASET_SETTINGS: Dict[str, Any] = {
     "tool_files": [
         "https://huggingface.co/datasets/stabletoolbench/ToolEnv2404/resolve/main/toolenv2404_filtered.tar.gz",
     ],
+
+    # URL of the archive containing the reference answers to the queries.
+    "reference_answers_path": "https://huggingface.co/datasets/stabletoolbench/baselines/blob/main/data_baselines.zip",
+
+    # the ID of the model that produced the reference answers.
+    "reference_model_id": None,  # "chatgpt_cot",
 
     # The number of queries to include in the evaluation or None to include all available queries.
     "queries_num": None,

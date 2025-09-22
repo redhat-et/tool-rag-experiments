@@ -1,6 +1,7 @@
 from typing import Any, Dict, List, Optional, Set
 import math
 
+from evaluator.components.data_provider import QuerySpecification
 from evaluator.interfaces.metric_collector import MetricCollector
 from evaluator.utils.module_extractor import register_metric_collector
 
@@ -52,14 +53,10 @@ class ToolRetrievalMetricCollector(MetricCollector):
         self._rows.clear()
         self._num_queries_with_retrieval = 0
 
-    def prepare_for_measurement(self, query: str) -> None:
+    def prepare_for_measurement(self, query_spec: QuerySpecification) -> None:
         pass
 
-    def register_measurement(self, query: str, **kwargs) -> None:
-        if "executed_tools" not in kwargs:
-            raise ValueError(f"{self.get_name()}: Mandatory parameter 'executed_tools' was not provided.")
-        executed_tools = kwargs["executed_tools"]
-
+    def register_measurement(self, query_spec: QuerySpecification, **kwargs) -> None:
         if "retrieved_tools" not in kwargs:
             raise ValueError(f"{self.get_name()}: Mandatory parameter 'retrieved_tools' was not provided.")
         retrieved_tools = kwargs["retrieved_tools"]
@@ -70,7 +67,7 @@ class ToolRetrievalMetricCollector(MetricCollector):
 
         self._num_queries_with_retrieval += 1
 
-        gold_set = set(executed_tools)
+        gold_set = set(query_spec.golden_tools.keys())
 
         # Build graded relevance list for retrieved items (post)
         rels_post = [self._grade(r, gold_set) for r in retrieved_tools]
