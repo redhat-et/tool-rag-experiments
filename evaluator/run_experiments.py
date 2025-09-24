@@ -1,6 +1,8 @@
 import asyncio
 import logging
 import os
+import sys
+import threading
 import time
 from pathlib import Path
 from typing import List, Tuple
@@ -61,7 +63,7 @@ async def run_all_experiments() -> None:
 
     experiment_specs = _produce_experiment_specs(algorithms, EXPERIMENTAL_ENVIRONMENT_SETTINGS)
 
-    mcp_proxy_manager = MCPProxyManager(os.getenv("MCP_PROXY_LOCAL_PORT"))
+    mcp_proxy_manager = MCPProxyManager(int(os.getenv("MCP_PROXY_LOCAL_PORT")))
 
     # Actually run the experiments
     with CSVLogger(metric_collectors,
@@ -69,14 +71,18 @@ async def run_all_experiments() -> None:
                    metadata_columns=["Experiment ID", "Algorithm", "Environment"]) as logger:
         for i, spec in enumerate(experiment_specs):
             algorithm, environment = spec
-            print(f"{'-' * 60}\nRunning Experiment {i+1} of {len(experiment_specs)}: "
-                  f"{algorithm.get_unique_id()}:{environment.dict()}...\n{'-' * 60}")
-            await _run_experiment(spec, metric_collectors, mcp_proxy_manager)
-            print(f"{'-' * 60}\nSummary of Experiment {i+1} - {algorithm.get_unique_id()}:{environment.dict()}\n{'-' * 60}")
-            logger.log_experiment(meta_values={"Experiment ID": i+1, "Algorithm": algorithm.get_unique_id(), "Environment": environment.dict()})
+            print(f"{'-' * 60}\nRunning Experiment {i+1} of {len(experiment_specs)}: {_spec_to_str(spec)}...\n{'-' * 60}")
+            await _run_experiment(i+1, spec, metric_collectors, mcp_proxy_manager)
+            print(f"{'-' * 60}\nSummary of Experiment {i+1} - {_spec_to_str(spec)}\n{'-' * 60}")
+            logger.log_experiment(meta_values={"Experiment ID": i+1, "Algorithm": algorithm.get_unique_id(), "Environment": environment.model_dump()})
 
     mcp_proxy_manager.stop_server()
-    print(f"Successfully executed {len(spec)} experiments.")
+    print(f"Successfully executed {len(experiment_specs)} experiment(s).")
+
+
+def _spec_to_str(spec: ExperimentSpec) -> str:
+    algorithm, environment = spec
+    return f"{algorithm.get_unique_id()}:{environment.model_dump()}"
 
 
 def _produce_experiment_specs(algorithms: List[ToolRagAlgorithm], env_specs: List[EvaluationEnvSpec]) -> List[ExperimentSpec]:
@@ -87,7 +93,8 @@ def _produce_experiment_specs(algorithms: List[ToolRagAlgorithm], env_specs: Lis
     return result
 
 
-async def _run_experiment(spec: ExperimentSpec,
+async def _run_experiment(exp_index: int,
+                          spec: ExperimentSpec,
                           metric_collectors: List[MetricCollector],
                           mcp_proxy_manager: MCPProxyManager,
                           ) -> None:
@@ -95,7 +102,7 @@ async def _run_experiment(spec: ExperimentSpec,
     algorithm, environment = spec
 
     for i, query_spec in enumerate(queries):
-        print(f"Processing query {i+1} of {len(queries)}...")
+        print(f"Processing query #{query_spec.id} (Experiment {exp_index}, {i+1} of {len(queries)})...")
 
         for mc in metric_collectors:
             mc.prepare_for_measurement(query_spec)
@@ -152,9 +159,8 @@ async def _set_up_experiment(spec: ExperimentSpec,
                              ) -> List[QuerySpecification]:
     algorithm, environment = spec
 
-    model_id = environment["model_id"]
-    print(f"Initializing LLM connection: {model_id}")
-    llm = get_llm(model_id=model_id)
+    print(f"Initializing LLM connection: {environment.model_id}")
+    llm = get_llm(model_id=environment.model_id)
     print("Connection established successfully.\n")
 
     print("Fetching queries for the current experiment...")
@@ -164,9 +170,9 @@ async def _set_up_experiment(spec: ExperimentSpec,
 
     print("Retrieving tool definitions for the current experiment...")
     tool_specs = get_tools_from_queries(queries)
-    tools = mcp_proxy_manager.run_mcp_proxy(tool_specs, init_client=True).get_tools()
+    tools = await mcp_proxy_manager.run_mcp_proxy(tool_specs, init_client=True).get_tools()
     print_iterable_verbose("The following tools will be available during evaluation:\n", tools)
-    print(f"The experiment will proceed with {len(tools)} tools.\n")
+    print(f"The experiment will proceed with {len(tools)} tool(s).\n")
 
     print("Setting up the algorithm and the metric collectors...")
     algorithm.set_up(llm, tools)

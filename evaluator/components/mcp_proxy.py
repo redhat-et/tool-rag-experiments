@@ -51,7 +51,7 @@ def _sanitize(name: str, used: set[str]) -> str:
 
 
 class MCPProxyManager(object):
-    def __init__(self, port):
+    def __init__(self, port: int):
         self.port = port
         self.server_switcher = UvicornServerSwitcher(port=port)
         print_verbose(f"MCP server configured on port {port}")
@@ -83,7 +83,7 @@ class MCPProxyManager(object):
             if default is not None and py_t is not str:
                 try:
                     default = py_t(default)
-                except TypeError:
+                except (TypeError, ValueError):
                     pass
 
             # Signature: required => no default; optional => has default

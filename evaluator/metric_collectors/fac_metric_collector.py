@@ -18,7 +18,7 @@ class FACMetricCollector(MetricCollector):
     Collects FAC metrics by directly calling a remote judge model
     with the StableToolBench FAC judge prompt.
     """
-    
+
     FAC_JUDGE_PROMPT = """
 Given a query and an answer provided by an AI agent, you now need to determine the answer_status of whether the well solved the query, i.e. whether the need of the query is satisfied. You need to output "Unsolved" or "Solved" and your reason. You must obey the following rules:
 
@@ -76,13 +76,13 @@ xxx (can only be "Solved" or "Unsolved")
 Reason
 xxx
 """
-    
+
     def __init__(self, settings: Dict):
         super().__init__(settings)
-        
+
         # Metrics storage
-        self.query_results = []
-        
+        self.query_results = None
+
         # judge model configuration
         self.judge_model_url = os.getenv('FAC_JUDGE_MODEL_URL')
         if not self.judge_model_url:
@@ -90,12 +90,13 @@ xxx
 
     def get_collected_metrics_names(self) -> List[str]:
         return [
-            "Final Answer Correctness Rate (%)"
+            "Average Task Success (FAC Evaluator)"
         ]
 
     def set_up(self) -> None:
         """Initialize the FAC metric collector."""
         super().set_up()
+        self.query_results = []
 
     def prepare_for_measurement(self, query_spec: QuerySpecification) -> None:
         """Prepare for measuring a single query."""
@@ -109,19 +110,19 @@ xxx
             # Extract final answer from algorithm response
             final_answer = extract_final_answer_from_response(response)
             final_answer = strip_think(final_answer)
-            
+
             # Evaluate using LLM judge model
             evaluation_result = self.evaluate_with_llm_judge(query, final_answer)
-            
+
             status_emoji = "✅" if evaluation_result["is_solved"] else "❌"
-            
+
             # Always store only the boolean for memory efficiency
             self.query_results.append(evaluation_result["is_solved"])
-            
+
             print_verbose(f"📊 FAC Query Evaluated: {query[:50]}... {status_emoji}")
             # Show detailed judge model output
             self.log_judge_output(query, final_answer, evaluation_result["evaluation"])
-            
+
         except Exception as e:
             # Store False for failed evaluations
             self.query_results.append(False)
@@ -131,7 +132,7 @@ xxx
         try:
             # Format the prompt
             prompt = self.FAC_JUDGE_PROMPT.format(query=query, answer=answer)
-            
+
             # Prepare payload for llm judge model
             payload = {
                 "prompt": prompt,
@@ -139,7 +140,7 @@ xxx
                 "do_sample": False,
                 "top_p": 1.0
             }
-            
+
             # Call judge model
             response = requests.post(
                 self.judge_model_url,
@@ -147,10 +148,10 @@ xxx
                 headers={"Content-Type": "application/json"},
                 timeout=30
             )
-            
+
             if response.status_code == 200:
                 result = response.json()
-                
+
                 # Extract generated text from response
                 generated_text = ""
                 if "generated_text" in result:
@@ -163,16 +164,16 @@ xxx
                     generated_text = result["output"]
                 else:
                     generated_text = str(result)
-                
+
                 # Extract only the evaluation part (look for the last "Answer Status:" in the response)
                 if "Answer Status:" in generated_text:
                     # Find the last occurrence of "Answer Status:" to get the actual evaluation
                     last_evaluation_start = generated_text.rfind("Answer Status:")
                     generated_text = generated_text[last_evaluation_start:]
-                
+
                 # Parse the evaluation to determine if solved
                 is_solved = self.parse_evaluation_result(generated_text)
-                
+
                 return {
                     "evaluation": generated_text,
                     "is_solved": is_solved
@@ -188,7 +189,7 @@ xxx
                     "evaluation": f"Answer Status: Unsolved\nReason: {error_msg}",
                     "is_solved": False
                 }
-                
+
         except Exception as e:
             error_msg = f"Error calling LLM judge model: {e}"
             print(f"❌ {error_msg}")
@@ -206,7 +207,7 @@ xxx
         try:
             # Convert to lowercase for case-insensitive matching
             text = evaluation_text.lower().strip()
-            
+
             # Look for "solved" or "unsolved" in the text
             if "unsolved" in text:
                 return False
@@ -216,7 +217,7 @@ xxx
                 # If unclear, default to unsolved (conservative approach)
                 print(f"⚠️ Unclear evaluation result: {evaluation_text[:100]}...")
                 return False
-                
+
         except Exception as e:
             print(f"❌ Error parsing evaluation result: {e}")
             return False
@@ -227,7 +228,7 @@ xxx
         print_verbose(f"\n{'='*60}")
         print_verbose(f"🔍 JUDGE MODEL EVALUATION")
         print_verbose(f"{'='*60}")
-        
+
         print_verbose(f"📝 Query: {query}")
         print_verbose(f"💬 Agent's Answer: {answer}")
         print_verbose(f"\n📋 Judge Model Output:")
@@ -241,16 +242,16 @@ xxx
 
     def report_results(self) -> Dict[str, Any]:
         """Report the collected metrics."""
-        
+
         total_queries = len(self.query_results)
         # Count solved queries from our direct evaluations
         solved_queries = sum(1 for is_solved in self.query_results if is_solved)
-        solve_rate = (solved_queries / total_queries) * 100
-        
-        print(f"Final Answer Correctness Rate: {solve_rate:.1f}% (Solved {solved_queries}/{total_queries} queries)")
+        solve_rate = solved_queries / total_queries
+
+        print(f"Average Task Success (FAC Evaluator): {solve_rate:.2f} (Solved {solved_queries}/{total_queries} queries)")
 
         results = {
-            "Final Answer Correctness Rate (%)": solve_rate
+            "Average Task Success (FAC Evaluator)": solve_rate
         }
-        
+
         return results

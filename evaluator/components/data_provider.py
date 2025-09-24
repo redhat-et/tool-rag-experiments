@@ -276,6 +276,10 @@ def _load_reference_answer(root_dir: Path, model_name: str or None, query_id: in
                         f'In {candidate_path}, "final_answer" should be a JSON string.'
                     )
 
+                if not outer_final:
+                    # the reference answer for this query is not available
+                    return None
+
                 inner = json.loads(outer_final)  # parse the stringified JSON
                 if "final_answer" not in inner:
                     raise ValueError(

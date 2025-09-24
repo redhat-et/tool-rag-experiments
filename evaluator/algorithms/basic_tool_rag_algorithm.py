@@ -1,11 +1,12 @@
 import os
 from typing import List, Dict
 from langchain.docstore.document import Document
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_core.vectorstores import VectorStore
+from langchain_huggingface import HuggingFaceEmbeddings
 
-from langchain_community.vectorstores import Milvus, VectorStore
 from langchain_core.language_models import BaseChatModel
 from langchain_core.tools import BaseTool
+from langchain_milvus import Milvus
 from langgraph.prebuilt import create_react_agent
 from pymilvus import connections, utility
 
@@ -16,6 +17,8 @@ from evaluator.interfaces.tool_rag_algorithm import ToolRagAlgorithm, AlgoRespon
 
 from dotenv import load_dotenv
 
+from evaluator.utils.utils import print_verbose
+
 load_dotenv()
 
 MILVUS_CONNECTION_ALIAS = "tools_connection"
@@ -25,6 +28,13 @@ OVERRIDE_COLLECTION = True
 DEFAULT_EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
 DEFAULT_TOOL_SELECTION_K = 3
 
+if not VERBOSE:
+    # Silence gRPC C-core and tracing
+    os.environ["GRPC_VERBOSITY"] = "ERROR"
+    os.environ["GRPC_TRACE"] = ""
+    os.environ["GRPC_ENABLE_FORK_SUPPORT"] = "0"
+    os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 
 @register_tool_rag_algorithm("basic_tool_rag")
 class BasicToolRagAlgorithm(ToolRagAlgorithm):
@@ -32,43 +42,43 @@ class BasicToolRagAlgorithm(ToolRagAlgorithm):
     model: BaseChatModel or None
     vector_store: VectorStore or None
 
+    # due to the limitations of Langchain tools we cannot truly serialize them. Therefore, indexing
+    # the tools themselves is not possible. Instead, we keep all tools in memory and only index their unique IDs (names)
+    # which are later used to retrieve the actual tools.
+    tool_name_to_base_tool: Dict[str, BaseTool] or None
+
     def __init__(self, settings: Dict):
         super().__init__(settings)
         self.model = None
+        self.tool_name_to_base_tool = None
         self.vector_store = None
 
     @staticmethod
-    def __tool_to_doc(tool: BaseTool) -> Document:
-        schema_str = tool.args_schema.schema_json(indent=2) if getattr(tool, "args_schema", None) else ""
-        text = f"{tool.name}\n\n{tool.description}\n\nArgs schema:\n{schema_str}"
-        meta = {
-            "tool_name": tool.name,
-            "json": tool.model_dump_json(),
-        }
-        return Document(page_content=text, metadata=meta)
+    def _create_docs_from_tools(tools: List[BaseTool]) -> List[Document]:
+        documents = []
+        for tool in tools:
+            documents.append(Document(page_content=tool.description, metadata={"name": tool.name}))
+        return documents
 
-    @staticmethod
-    def __doc_to_tool(doc: Document) -> BaseTool:
-        return BaseTool.model_validate_json(doc["metadata"]["json"])
+    def _index_tools(self, tools: List[BaseTool]) -> None:
+        self.tool_name_to_base_tool = {tool.name: tool for tool in tools}
 
-    def __get_or_index_tools(self, tools: List[BaseTool]) -> VectorStore:
         embedding_model_name = self._settings.get("embedding_model_id", DEFAULT_EMBEDDING_MODEL_NAME)
         embeddings = HuggingFaceEmbeddings(model_name=embedding_model_name)
         milvus_uri = os.getenv("MILVUS_PATH")
 
         connections.connect(alias=MILVUS_CONNECTION_ALIAS, uri=milvus_uri)
         if not OVERRIDE_COLLECTION and utility.has_collection(COLLECTION_NAME):
-            print(f"[INFO] Loading Milvus server collection: {COLLECTION_NAME}")
-            return Milvus(
+            print_verbose(f"Loading Milvus server collection: {COLLECTION_NAME}")
+            self.vector_store = Milvus(
                 embedding_function=embeddings,
                 collection_name=COLLECTION_NAME,
                 connection_args={"uri": milvus_uri}
             )
 
-        print(f"[INFO] Creating new Milvus collection on the server: {COLLECTION_NAME}")
-        docs = [Document(page_content=tool.model_dump_json(), metadata=tool.metadata) for tool in tools]
-        return Milvus.from_documents(
-            documents=docs,
+        print_verbose(f"Creating new Milvus collection on the server: {COLLECTION_NAME}")
+        self.vector_store = Milvus.from_documents(
+            documents=self._create_docs_from_tools(tools),
             embedding=embeddings,
             collection_name=COLLECTION_NAME,
             connection_args={"uri": milvus_uri},
@@ -77,15 +87,17 @@ class BasicToolRagAlgorithm(ToolRagAlgorithm):
 
     def set_up(self, model: BaseChatModel, tools: List[BaseTool]) -> None:
         self.model = model
-        self.vector_store = self.__get_or_index_tools(tools)
+        self._index_tools(tools)
 
     async def process_query(self, query_spec: QuerySpecification) -> AlgoResponse:
         if not self.vector_store:
             raise RuntimeError("process_query called before set_up")
 
         top_k = self._settings.get("top_k", DEFAULT_TOOL_SELECTION_K)
-        relevant_tool_defs = self.vector_store.similarity_search(query_spec.query, k=top_k)
-        relevant_tools = [BasicToolRagAlgorithm.__doc_to_tool(d) for d in relevant_tool_defs]
+        relevant_documents = self.vector_store.similarity_search(query_spec.query, k=top_k)
+        relevant_tool_names = [d.metadata["name"] for d in relevant_documents]
+        print_verbose(f"Retrieved tools for query #{query_spec.id}: {relevant_tool_names}")
+        relevant_tools = [self.tool_name_to_base_tool[name] for name in relevant_tool_names]
 
         agent = create_react_agent(self.model, relevant_tools)
         print_mode = "debug" if VERBOSE else ()
@@ -94,7 +106,7 @@ class BasicToolRagAlgorithm(ToolRagAlgorithm):
             max_iterations=6,
             print_mode=print_mode
         )
-        return response, [tool.name for tool in relevant_tools]
+        return response, relevant_tool_names
 
     def tear_down(self) -> None:
         connections.disconnect(alias=MILVUS_CONNECTION_ALIAS)

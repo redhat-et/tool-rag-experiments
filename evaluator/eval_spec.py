@@ -30,8 +30,8 @@ PluginConfigSpec = Tuple[str, Dict[str, Any]]
 VERBOSE = False
 
 EVALUATED_ALGORITHMS: List[PluginConfigSpec] = [
-    ("no_tool_rag_baseline", {}),
-    #("basic_tool_rag", {"top_k": 5, "embedding_model_id": "all-MiniLM-L6-v2"}),
+    #("no_tool_rag_baseline", {}),
+    ("basic_tool_rag", {"top_k": 3, "embedding_model_id": "all-MiniLM-L6-v2"}),
 ]
 
 EXPERIMENTAL_ENVIRONMENT_SETTINGS: List[EvaluationEnvSpec] = [
@@ -39,15 +39,18 @@ EXPERIMENTAL_ENVIRONMENT_SETTINGS: List[EvaluationEnvSpec] = [
         model_id="Qwen/Qwen3-8B",
         irrelevant_tools_ratio=0.0,
         irrelevant_tools_from_same_categories=True
-    )
+    ),
 ]
 
 METRIC_COLLECTORS: List[PluginConfigSpec] = [
+    ("answer_quality_metric_collector", dict(judges={
+        "task_success_no_ref": "AtlaAI/Selene-1-Mini-Llama-3.1-8B",
+        "task_success_with_ref": "AtlaAI/Selene-1-Mini-Llama-3.1-8B",
+    })),
     ("fac_metric_collector", {}),
     ("tool_selection_metric_collector", {}),
     ("tool_retrieval_metric_collector", {"ks": [1, 3, 5], "ap_rel_threshold": 1.0}),
     ("efficiency_metric_collector", {}),
-    #("answer_quality_metric_collector", {"task_success_with_ref": "AtlaAI/Selene-1-Mini-Llama-3.1-8B"}),
 ]
 
 DATASET_SETTINGS: Dict[str, Any] = {
@@ -61,7 +64,7 @@ DATASET_SETTINGS: Dict[str, Any] = {
 
     # URLs of the files to fetch the tools from.
     # Will only be downloaded if not already available locally.
-    # TODO: as of now, providing more than one path is not supported!
+    # As of now, providing more than one path is not supported!
     "tool_files": [
         "https://huggingface.co/datasets/stabletoolbench/ToolEnv2404/resolve/main/toolenv2404_filtered.tar.gz",
     ],
@@ -70,7 +73,7 @@ DATASET_SETTINGS: Dict[str, Any] = {
     "reference_answers_path": "https://huggingface.co/datasets/stabletoolbench/baselines/resolve/main/data_baselines.zip",
 
     # the ID of the model that produced the reference answers.
-    "reference_model_id": None,  # "chatgpt_cot",
+    "reference_model_id": "chatgpt_cot",
 
     # The number of queries to include in the evaluation or None to include all available queries.
     "queries_num": None,

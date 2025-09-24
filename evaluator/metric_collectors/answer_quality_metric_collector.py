@@ -8,8 +8,7 @@ from evaluator.components.data_provider import QuerySpecification
 from evaluator.components.llm_provider import get_llm, query_llm
 from evaluator.interfaces.metric_collector import MetricCollector
 from evaluator.utils.module_extractor import register_metric_collector
-from evaluator.utils.utils import extract_final_answer_from_response, strip_think
-
+from evaluator.utils.utils import extract_final_answer_from_response, strip_think, print_verbose
 
 # ===============================
 # Version & Scope Note
@@ -156,11 +155,13 @@ class AnswerQualityMetricCollector(MetricCollector):
 
         # For each requested metric, run its own prompt+judge
         if TASK_SUCCESS_NO_REF in self.metrics:
+            user_prompt = _user_task_success_no_ref(query, final_answer or "")
+            print_verbose(user_prompt)
             out = self._parse_judge_score(
                 query_llm(
                     model=self.judges[TASK_SUCCESS_NO_REF],
                     system_prompt=_SYS_TASK_SUCCESS_NO_REF,
-                    user_prompt=_user_task_success_no_ref(query, final_answer or ""),
+                    user_prompt=user_prompt,
                 )
             )
             row["task_success_no_ref_j"] = out.get("score")
@@ -173,33 +174,39 @@ class AnswerQualityMetricCollector(MetricCollector):
                 row["task_success_with_ref_j"] = None
                 row["task_success_with_ref_j_rationale"] = "reference_answer missing"
             else:
+                user_prompt = _user_task_success_with_ref(query, final_answer or "", ref_answer or "")
+                print_verbose(user_prompt)
                 out = self._parse_judge_score(
                     query_llm(
                         model=self.judges[TASK_SUCCESS_WITH_REF],
                         system_prompt=_SYS_TASK_SUCCESS_WITH_REF,
-                        user_prompt=_user_task_success_with_ref(query, final_answer or "", ref_answer or ""),
+                        user_prompt=user_prompt,
                     )
                 )
                 row["task_success_with_ref_j"] = out.get("score")
                 row["task_success_with_ref_j_rationale"] = out.get("rationale")
 
         if COVERAGE in self.metrics:
+            user_prompt = _user_coverage(query, final_answer or "")
+            print_verbose(user_prompt)
             out = self._parse_judge_score(
                 query_llm(
                     model=self.judges[COVERAGE],
                     system_prompt=_SYS_COVERAGE,
-                    user_prompt=_user_coverage(query, final_answer or ""),
+                    user_prompt=user_prompt,
                 )
             )
             row["coverage_j"] = out.get("score")
             row["coverage_j_rationale"] = out.get("rationale")
 
         if CLARITY in self.metrics:
+            user_prompt = _user_clarity(final_answer or "")
+            print_verbose(user_prompt)
             out = self._parse_judge_score(
                 query_llm(
                     model=self.judges[CLARITY],
                     system_prompt=_SYS_CLARITY,
-                    user_prompt=_user_clarity(final_answer or ""),
+                    user_prompt=user_prompt,
                 )
             )
             row["clarity_j"] = out.get("score")
@@ -237,10 +244,14 @@ class AnswerQualityMetricCollector(MetricCollector):
             out[METRIC_NAME_TO_DESCRIPTION[CLARITY]] = mean("clarity_j")
             # out["clarity_j_support"] = len(vals("clarity_j"))
 
+        for key, value in out.items():
+            print(f"{key}: {value:.2f}")
         return out
 
     @staticmethod
     def _parse_judge_score(text: str) -> Dict[str, Any]:
+        print_verbose(f"JUDGE EVALUATION:\n{text}")
+
         def clip01(x: float) -> float or None:
             if x is None:
                 return None

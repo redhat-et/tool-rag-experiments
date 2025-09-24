@@ -21,7 +21,7 @@ class ToolSelectionMetricCollector(MetricCollector):
         self.recall_sum = None
 
     def get_collected_metrics_names(self) -> List[str]:
-        return ["Exact Match Rate",
+        return ["Exact Tool Selection Match Rate",
                 "Tool Selection Precision",
                 "Tool Selection Recall",
                 "Spurious Tool Calling Rate"]
@@ -95,7 +95,7 @@ class ToolSelectionMetricCollector(MetricCollector):
             raise RuntimeError("No measurements registered, cannot produce results.")
 
         results = {
-            "Exact Match Rate": self.exact_matches / self.total_queries,
+            "Exact Tool Selection Match Rate": self.exact_matches / self.total_queries,
             "Tool Selection Precision": self.precision_sum / self.total_queries,
             "Tool Selection Recall": self.recall_sum / self.total_queries,
             "Spurious Tool Calling Rate": 1.0 - (self.precision_sum / self.total_queries),
