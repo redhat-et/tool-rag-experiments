@@ -51,10 +51,9 @@ class BasicToolRagAlgorithm(ToolRagAlgorithm):
     def __doc_to_tool(doc: Document) -> BaseTool:
         return BaseTool.model_validate_json(doc["metadata"]["json"])
 
-    @staticmethod
-    def __get_or_index_tools(tools: List[BaseTool]) -> VectorStore:
-        embeddings = HuggingFaceEmbeddings(model_name=os.getenv("EMBEDDING_MODEL_NAME",
-                                                                DEFAULT_EMBEDDING_MODEL_NAME))
+    def __get_or_index_tools(self, tools: List[BaseTool]) -> VectorStore:
+        embedding_model_name = self._settings.get("embedding_model_id", DEFAULT_EMBEDDING_MODEL_NAME)
+        embeddings = HuggingFaceEmbeddings(model_name=embedding_model_name)
         milvus_uri = os.getenv("MILVUS_PATH")
 
         connections.connect(alias=MILVUS_CONNECTION_ALIAS, uri=milvus_uri)

@@ -3,7 +3,7 @@ import pkgutil
 import traceback
 from typing import Type, Dict, Any, Sequence, List
 
-from evaluator.eval_spec import Spec
+from evaluator.eval_spec import PluginConfigSpec
 from evaluator.interfaces.metric_collector import MetricCollector
 from evaluator.interfaces.tool_rag_algorithm import ToolRagAlgorithm
 
@@ -50,7 +50,7 @@ def register_tool_rag_algorithm(name: str):
     return _decorator
 
 
-def create_algorithms(specs: Sequence[Spec]) -> List[ToolRagAlgorithm]:
+def create_algorithms(specs: Sequence[PluginConfigSpec]) -> List[ToolRagAlgorithm]:
     """
     specs: [("algorithm_a", {...}), ("algorithm_b", {...}), ...]
     returns: [AlgorithmA(...), AlgorithmB(...), ...]
@@ -79,7 +79,7 @@ def register_metric_collector(name: str):
     return _decorator
 
 
-def create_metric_collectors(specs: Sequence[Spec]) -> List[MetricCollector]:
+def create_metric_collectors(specs: Sequence[PluginConfigSpec]) -> List[MetricCollector]:
     """
     specs: [("collector_a", {...}), ("collector_b", {...}), ...]
     returns: [CollectorA(...), CollectorB(...), ...]

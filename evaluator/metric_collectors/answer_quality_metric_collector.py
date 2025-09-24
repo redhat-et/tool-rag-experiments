@@ -1,9 +1,7 @@
 import json
-import os
 import re
 from typing import Any, Dict, List
 
-from dotenv import load_dotenv
 from langchain_core.language_models import BaseChatModel
 
 from evaluator.components.data_provider import QuerySpecification
@@ -12,7 +10,6 @@ from evaluator.interfaces.metric_collector import MetricCollector
 from evaluator.utils.module_extractor import register_metric_collector
 from evaluator.utils.utils import extract_final_answer_from_response, strip_think
 
-load_dotenv()
 
 # ===============================
 # Version & Scope Note
@@ -47,11 +44,6 @@ METRIC_NAME_TO_DESCRIPTION = {
     TASK_SUCCESS_WITH_REF: "Average Task Success (With Ref)",
     COVERAGE: "Coverage of Constraints and Requirements",
     CLARITY: "Readability, Conciseness and Structure",
-}
-
-JUDGE_MODEL_ID_TO_URL = {
-    "AtlaAI/Selene-1-Mini-Llama-3.1-8B": os.getenv("SELENE_JUDGE_MODEL_URL"),
-    # more judge models to be added if needed
 }
 
 
@@ -132,12 +124,7 @@ class AnswerQualityMetricCollector(MetricCollector):
 
         self.judges: Dict[str, BaseChatModel] = {}
         for metric, model_id in judge_models.items():
-            if model_id not in JUDGE_MODEL_ID_TO_URL:
-                raise ValueError(f"Unknown judge model: {model_id}\n"
-                                 f"Please make sure to add your model to the list of registered judges "
-                                 f"in answer_quality_metric_collector")
-            model_url = JUDGE_MODEL_ID_TO_URL[model_id]
-            self.judges[metric] = get_llm(provider_id="vllm", model_id=model_id, base_url=model_url)
+            self.judges[metric] = get_llm(model_id=model_id)
 
         self._rows: List[Dict[str, Any]] = []
         self._n = 0

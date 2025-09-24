@@ -8,9 +8,8 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from evaluator.eval_spec import DATASET_SETTINGS
+from evaluator.eval_spec import DATASET_SETTINGS, EvaluationEnvSpec
 from evaluator.utils.file_downloader import fetch_remote_paths
-
 
 ToolSet = Dict[str, Dict[str, Any]]
 
@@ -157,7 +156,7 @@ def _load_random_tools(categories: List[str] or None, tool_num: int) -> ToolSet:
     return tool_api_list_to_tool_set(loaded_tools)
 
 
-def _parse_raw_query_tool_definitions(query: Dict[str, Any]) -> Tuple[ToolSet or None, ToolSet or None]:
+def _parse_raw_query_tool_definitions(query: Dict[str, Any], experiment_environment: EvaluationEnvSpec) -> Tuple[ToolSet or None, ToolSet or None]:
     """
     This method receives the query dict in the ToolBench dataset format.
     It returns the golden set of tools for this query. It is returned as a dictionary where
@@ -191,17 +190,16 @@ def _parse_raw_query_tool_definitions(query: Dict[str, Any]) -> Tuple[ToolSet or
     additional_tools = tool_api_list_to_tool_set(additional_tool_apis)
 
     # extract additional irrelevant tools if needed
-    required_number_of_additional_tools = math.ceil(DATASET_SETTINGS["irrelevant_tools_ratio"] * len(golden_tools))
-    irrelevant_tools_from_same_categories = DATASET_SETTINGS["irrelevant_tools_from_same_categories"]
+    required_number_of_additional_tools = math.ceil(experiment_environment.irrelevant_tools_ratio * len(golden_tools))
     if required_number_of_additional_tools == 0:
         return golden_tools, None
-    if irrelevant_tools_from_same_categories and required_number_of_additional_tools <= len(additional_tools):
+    if experiment_environment.irrelevant_tools_from_same_categories and required_number_of_additional_tools <= len(additional_tools):
         # only return a subset of additional_tools
         additional_tools = dict(itertools.islice(additional_tools.items(), required_number_of_additional_tools))
         return golden_tools, additional_tools
 
     # if we reached this point, more tools are needed
-    if irrelevant_tools_from_same_categories:
+    if experiment_environment.irrelevant_tools_from_same_categories:
         category_names = list(set([tool_api["category_name"] for tool_api in golden_tools.values()]))
         random_toolset = _load_random_tools(category_names, required_number_of_additional_tools - len(additional_tools))
         additional_tools.update(random_toolset)
@@ -294,21 +292,29 @@ def _load_reference_answer(root_dir: Path, model_name: str or None, query_id: in
 def _load_queries_from_single_file(
         query_file_path: str or Path,
         max_queries_num: int or None,
-        root_dataset_path: str or Path
+        root_dataset_path: str or Path,
+        experiment_environment: EvaluationEnvSpec,
 ) -> List[QuerySpecification]:
     with open(query_file_path, 'r') as f:
         data = json.load(f)
 
+    if DATASET_SETTINGS["reference_model_id"] is None:
+        # judge-based evaluation is disabled - no need to load reference answers
+        reference_answers_local_dir = None
+    else:
+        reference_answers_local_dir = fetch_remote_paths(
+            [DATASET_SETTINGS["reference_answers_path"]],
+            root_dataset_path
+        )[0]
+
     queries = []
-    reference_answers_local_dir = fetch_remote_paths([DATASET_SETTINGS["reference_answers_path"]],
-                                                     root_dataset_path)[0]
     for raw_query_spec in data:
         if "query" not in raw_query_spec or "query_id" not in raw_query_spec:
             print(f"Invalid query spec, skipping this query.")
         else:
             query = raw_query_spec.get("query")
             query_id = int(raw_query_spec.get("query_id"))
-            golden_tools, additional_tools = _parse_raw_query_tool_definitions(raw_query_spec)
+            golden_tools, additional_tools = _parse_raw_query_tool_definitions(raw_query_spec, experiment_environment)
             if golden_tools is not None:
                 reference_answer = _load_reference_answer(
                     reference_answers_local_dir,
@@ -332,7 +338,7 @@ def _load_queries_from_single_file(
     return queries
 
 
-def get_queries() -> List[QuerySpecification]:
+def get_queries(experiment_environment: EvaluationEnvSpec) -> List[QuerySpecification]:
     """Load queries from the dataset."""
     root_dataset_path = Path(os.getenv("ROOT_DATASET_PATH"))
     if not root_dataset_path:
@@ -352,7 +358,10 @@ def get_queries() -> List[QuerySpecification]:
             None if DATASET_SETTINGS["queries_num"] is None else DATASET_SETTINGS["queries_num"] - len(queries)
         if remaining_queries_num == 0:
             break
-        new_queries = _load_queries_from_single_file(path, remaining_queries_num, root_dataset_path)
+        new_queries = _load_queries_from_single_file(path,
+                                                     remaining_queries_num,
+                                                     root_dataset_path,
+                                                     experiment_environment)
         queries.extend(new_queries)
 
     return queries
