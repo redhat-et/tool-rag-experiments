@@ -5,8 +5,9 @@ from langchain_core.tools import BaseTool
 from langgraph.prebuilt import create_react_agent
 
 from evaluator.components.data_provider import QuerySpecification
+from evaluator.eval_spec import VERBOSE
 from evaluator.utils.module_extractor import register_tool_rag_algorithm
-from evaluator.interfaces.tool_rag_algorithm import ToolRagAlgorithm
+from evaluator.interfaces.tool_rag_algorithm import ToolRagAlgorithm, AlgoResponse
 
 
 @register_tool_rag_algorithm("no_tool_rag_baseline")
@@ -16,7 +17,7 @@ class NoToolRagAlgorithm(ToolRagAlgorithm):
         self.model = None
         self.all_tools = None
 
-    def set_up(self, model: BaseChatModel, tools: List[BaseTool]):
+    def set_up(self, model: BaseChatModel, tools: List[BaseTool]) -> None:
         self.model = model
         self.all_tools = tools
 
@@ -35,12 +36,20 @@ class NoToolRagAlgorithm(ToolRagAlgorithm):
                 filtered_tools.append(tool)
         return filtered_tools
 
-    async def process_query(self, query_spec: QuerySpecification):
+    async def process_query(self, query_spec: QuerySpecification) -> AlgoResponse:
         if not self.all_tools:
             raise RuntimeError("process_query called before set_up")
 
-        agent = create_react_agent(self.model, self._filter_relevant_tools(query_spec))
-        return await agent.ainvoke({"messages": query_spec.query})
+        tools = self._filter_relevant_tools(query_spec)
+        agent = create_react_agent(self.model, tools)
+        print_mode = "debug" if VERBOSE else ()
 
-    def tear_down(self):
+        response = await agent.ainvoke(
+            input={"messages": query_spec.query},
+            max_iterations=6,
+            print_mode=print_mode
+        )
+        return response, None
+
+    def tear_down(self) -> None:
         pass

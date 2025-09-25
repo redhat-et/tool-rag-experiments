@@ -19,13 +19,12 @@ class ToolSelectionMetricCollector(MetricCollector):
         self.exact_matches = None
         self.precision_sum = None
         self.recall_sum = None
-        self.f1_sum = None
 
     def get_collected_metrics_names(self) -> List[str]:
-        return ["Tool Selection Exact Match Rate",
-                "Tool Selection Precision (Average)",
-                "Tool Selection Recall (Average)",
-                "Tool Selection F1 (Average)"]
+        return ["Exact Tool Selection Match Rate",
+                "Tool Selection Precision",
+                "Tool Selection Recall",
+                "Spurious Tool Calling Rate"]
 
     def set_up(self) -> None:
         super().set_up()
@@ -34,7 +33,6 @@ class ToolSelectionMetricCollector(MetricCollector):
         self.exact_matches = 0
         self.precision_sum = 0.0
         self.recall_sum = 0.0
-        self.f1_sum = 0.0
 
     def prepare_for_measurement(self, query_spec: QuerySpecification) -> None:
         pass
@@ -62,17 +60,10 @@ class ToolSelectionMetricCollector(MetricCollector):
         else:
             recall = 1.0  # Perfect recall if no tools were needed
 
-        # F1 score: harmonic mean of precision and recall
-        if (precision + recall) > 0:
-            f1_score = (2 * precision * recall) / (precision + recall)
-        else:
-            f1_score = 0.0
-
         return {
             "exact_match": exact_match,
             "precision": precision,
-            "recall": recall,
-            "f1": f1_score
+            "recall": recall
         }
 
     def register_measurement(self, query_spec: QuerySpecification, **kwargs) -> None:
@@ -93,7 +84,6 @@ class ToolSelectionMetricCollector(MetricCollector):
             self.exact_matches += 1
         self.precision_sum += metrics["precision"]
         self.recall_sum += metrics["recall"]
-        self.f1_sum += metrics["f1"]
 
     def tear_down(self) -> None:
         super().tear_down()
@@ -105,13 +95,12 @@ class ToolSelectionMetricCollector(MetricCollector):
             raise RuntimeError("No measurements registered, cannot produce results.")
 
         results = {
-            "Tool Selection Exact Match Rate": self.exact_matches / self.total_queries,
-            "Tool Selection Precision (Average)": self.precision_sum / self.total_queries,
-            "Tool Selection Recall (Average)": self.recall_sum / self.total_queries,
-            "Tool Selection F1 (Average)": self.f1_sum / self.total_queries
+            "Exact Tool Selection Match Rate": self.exact_matches / self.total_queries,
+            "Tool Selection Precision": self.precision_sum / self.total_queries,
+            "Tool Selection Recall": self.recall_sum / self.total_queries,
+            "Spurious Tool Calling Rate": 1.0 - (self.precision_sum / self.total_queries),
         }
 
-        print(f"Tool selection metrics:")
         for key, value in results.items():
-            print(f"{key}: {value}")
+            print(f"{key}: {value:.3f}")
         return results

@@ -8,9 +8,8 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from evaluator.eval_spec import DATASET_SETTINGS
+from evaluator.eval_spec import DATASET_SETTINGS, EvaluationEnvSpec
 from evaluator.utils.file_downloader import fetch_remote_paths
-
 
 ToolSet = Dict[str, Dict[str, Any]]
 
@@ -18,11 +17,13 @@ ToolSet = Dict[str, Dict[str, Any]]
 class QuerySpecification(BaseModel):
     """
     A query specification contains the following:
+    - the unique query ID
     - the query text
     - optionally, the reference answer
     - a set of golden tools that have to be invoked in order to solve the query
     - optionally, additional tools to be made available to the model at evaluation time
     """
+    id: int
     query: str
     reference_answer: Optional[str] = None
     golden_tools: ToolSet = Field(default_factory=dict)
@@ -155,7 +156,7 @@ def _load_random_tools(categories: List[str] or None, tool_num: int) -> ToolSet:
     return tool_api_list_to_tool_set(loaded_tools)
 
 
-def _parse_raw_query_tool_definitions(query: Dict[str, Any]) -> Tuple[ToolSet or None, ToolSet or None]:
+def _parse_raw_query_tool_definitions(query: Dict[str, Any], experiment_environment: EvaluationEnvSpec) -> Tuple[ToolSet or None, ToolSet or None]:
     """
     This method receives the query dict in the ToolBench dataset format.
     It returns the golden set of tools for this query. It is returned as a dictionary where
@@ -189,17 +190,16 @@ def _parse_raw_query_tool_definitions(query: Dict[str, Any]) -> Tuple[ToolSet or
     additional_tools = tool_api_list_to_tool_set(additional_tool_apis)
 
     # extract additional irrelevant tools if needed
-    required_number_of_additional_tools = math.ceil(DATASET_SETTINGS["irrelevant_tools_ratio"] * len(golden_tools))
-    irrelevant_tools_from_same_categories = DATASET_SETTINGS["irrelevant_tools_from_same_categories"]
+    required_number_of_additional_tools = math.ceil(experiment_environment.irrelevant_tools_ratio * len(golden_tools))
     if required_number_of_additional_tools == 0:
         return golden_tools, None
-    if irrelevant_tools_from_same_categories and required_number_of_additional_tools <= len(additional_tools):
+    if experiment_environment.irrelevant_tools_from_same_categories and required_number_of_additional_tools <= len(additional_tools):
         # only return a subset of additional_tools
         additional_tools = dict(itertools.islice(additional_tools.items(), required_number_of_additional_tools))
         return golden_tools, additional_tools
 
     # if we reached this point, more tools are needed
-    if irrelevant_tools_from_same_categories:
+    if experiment_environment.irrelevant_tools_from_same_categories:
         category_names = list(set([tool_api["category_name"] for tool_api in golden_tools.values()]))
         random_toolset = _load_random_tools(category_names, required_number_of_additional_tools - len(additional_tools))
         additional_tools.update(random_toolset)
@@ -209,55 +209,166 @@ def _parse_raw_query_tool_definitions(query: Dict[str, Any]) -> Tuple[ToolSet or
     return golden_tools, random_toolset
 
 
-def _load_queries_from_single_file(query_file_path: str or Path, max_queries_num: int or None) -> List[QuerySpecification]:
+def _load_reference_answer(root_dir: Path, model_name: str or None, query_id: int) -> str or None:
+    """
+    Load the final answer for a given query produced by a given model.
+
+    Directory layout:
+      root_dir/
+        └── {model_name}/
+            ├── subdir_a/
+            │   ├── {query_id}_*.json
+            │   └── ...
+            └── subdir_b/
+                └── ...
+
+    Each matching JSON file has the structure:
+      {
+        "answer_generation": {
+          "final_answer": "<JSON string>"
+        }
+      }
+    where the string parses to:
+      { "final_answer": <the value to return> }
+
+    Args:
+        root_dir: Path to the root answers directory.
+        model_name: Name of the model (must match the directory name under root_dir).
+        query_id: Integer query ID. The JSON filename begins with "{query_id}_".
+
+    Returns:
+        The value stored under the nested "final_answer" key (representing the final answer to the query).
+
+    Raises:
+        FileNotFoundError: If the model directory or the query file cannot be found.
+        ValueError: If the JSON structure is malformed or missing required keys.
+        json.JSONDecodeError: If any JSON parsing fails.
+    """
+    if model_name is None:
+        # this evaluation will proceed without reference answers
+        return None
+
+    model_dir = root_dir / model_name
+    if not model_dir.is_dir():
+        raise FileNotFoundError(f"Model directory not found: {model_dir}")
+
+    prefix = f"{query_id}_"
+
+    # Search all subdirectories (any depth) under the model directory
+    for dirpath, _, filenames in os.walk(model_dir):
+        for fname in filenames:
+            if fname.startswith(prefix) and fname.endswith(".json"):
+                candidate_path = os.path.join(dirpath, fname)
+                # Found the first matching file; return immediately after parsing
+                with open(candidate_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+
+                try:
+                    outer_final = data["answer_generation"]["final_answer"]
+                except (KeyError, TypeError):
+                    raise ValueError(
+                        f"File {candidate_path} is missing "
+                        '["answer_generation"]["final_answer"].'
+                    )
+
+                if not isinstance(outer_final, str):
+                    raise ValueError(
+                        f'In {candidate_path}, "final_answer" should be a JSON string.'
+                    )
+
+                if not outer_final:
+                    # the reference answer for this query is not available
+                    return None
+
+                inner = json.loads(outer_final)  # parse the stringified JSON
+                if "final_answer" not in inner:
+                    raise ValueError(
+                        f'Inner JSON in {candidate_path} is missing "final_answer".'
+                    )
+                return inner["final_answer"]
+
+    # If we get here, nothing matched
+    raise FileNotFoundError(
+        f"No JSON starting with '{prefix}' found under: {model_dir}"
+    )
+
+
+def _load_queries_from_single_file(
+        query_file_path: str or Path,
+        max_queries_num: int or None,
+        root_dataset_path: str or Path,
+        experiment_environment: EvaluationEnvSpec,
+) -> List[QuerySpecification]:
     with open(query_file_path, 'r') as f:
         data = json.load(f)
 
+    if DATASET_SETTINGS["reference_model_id"] is None:
+        # judge-based evaluation is disabled - no need to load reference answers
+        reference_answers_local_dir = None
+    else:
+        reference_answers_local_dir = fetch_remote_paths(
+            [DATASET_SETTINGS["reference_answers_path"]],
+            root_dataset_path
+        )[0]
+
     queries = []
     for raw_query_spec in data:
-        query = raw_query_spec.get("query", "")
-        golden_tools, additional_tools = _parse_raw_query_tool_definitions(raw_query_spec)
-        if golden_tools is not None:
-            queries.append(
-                QuerySpecification(query=query, golden_tools=golden_tools, additional_tools=additional_tools or None)
-            )
+        if "query" not in raw_query_spec or "query_id" not in raw_query_spec:
+            print(f"Invalid query spec, skipping this query.")
         else:
-            print(f"Couldn't extract the tool definitions, skipping this query.")
+            query = raw_query_spec.get("query")
+            query_id = int(raw_query_spec.get("query_id"))
+            golden_tools, additional_tools = _parse_raw_query_tool_definitions(raw_query_spec, experiment_environment)
+            if golden_tools is not None:
+                reference_answer = _load_reference_answer(
+                    reference_answers_local_dir,
+                    DATASET_SETTINGS["reference_model_id"],
+                    query_id
+                )
+                queries.append(
+                    QuerySpecification(
+                        id=query_id,
+                        query=query,
+                        reference_answer=reference_answer,
+                        golden_tools=golden_tools,
+                        additional_tools=additional_tools or None
+                    )
+                )
+            else:
+                print(f"Couldn't extract the tool definitions, skipping this query.")
         if max_queries_num is not None and len(queries) >= max_queries_num:
             break
 
     return queries
 
 
-def get_queries() -> List[QuerySpecification]:
+def get_queries(experiment_environment: EvaluationEnvSpec) -> List[QuerySpecification]:
     """Load queries from the dataset."""
-    try:
-        root_dataset_path = Path(os.getenv("ROOT_DATASET_PATH"))
-        if not root_dataset_path:
-            print(f"⚠️ Root dataset folder not configured, using fallback queries.")
-            return get_fallback_queries()
+    root_dataset_path = Path(os.getenv("ROOT_DATASET_PATH"))
+    if not root_dataset_path:
+        raise ValueError(f"⚠️ Root dataset folder not configured, using fallback queries.")
 
-        remote_query_files = DATASET_SETTINGS["query_files"]
-        if not remote_query_files:
-            print(f"⚠️ Query files not configured properly, using fallback queries.")
-            return get_fallback_queries()
+    remote_query_files = DATASET_SETTINGS["query_files"]
+    if not remote_query_files:
+        raise ValueError(f"⚠️ Query files not configured properly, using fallback queries.")
 
-        # Download the query files if needed
-        local_paths = fetch_remote_paths(remote_query_files, root_dataset_path)
+    # Download the query files if needed
+    local_paths = fetch_remote_paths(remote_query_files, root_dataset_path)
 
-        # Actually load the queries
-        queries = []
-        for path in local_paths:
-            remaining_queries = \
-                None if DATASET_SETTINGS["queries_num"] is None else DATASET_SETTINGS["queries_num"] - len(queries)
-            new_queries = _load_queries_from_single_file(path, remaining_queries)
-            queries.extend(new_queries)
-        return queries
+    # Actually load the queries
+    queries = []
+    for path in local_paths:
+        remaining_queries_num = \
+            None if DATASET_SETTINGS["queries_num"] is None else DATASET_SETTINGS["queries_num"] - len(queries)
+        if remaining_queries_num == 0:
+            break
+        new_queries = _load_queries_from_single_file(path,
+                                                     remaining_queries_num,
+                                                     root_dataset_path,
+                                                     experiment_environment)
+        queries.extend(new_queries)
 
-    except Exception as e:
-        print(f"❌ Error loading dataset: {e}")
-        print("Using fallback queries")
-        return get_fallback_queries()
+    return queries
 
 
 def get_tools_from_queries(queries: List[QuerySpecification]) -> ToolSet:
@@ -269,14 +380,3 @@ def get_tools_from_queries(queries: List[QuerySpecification]) -> ToolSet:
             tools.update(query_spec.additional_tools)
 
     return tools
-
-
-def get_fallback_queries() -> List[QuerySpecification]:
-    """Fallback queries if dataset loading fails."""
-    return [
-        QuerySpecification(query="What is the weather in New York?", golden_tools=["weather_info"]),
-        QuerySpecification(query="How many words are in 'Hello World, this is a test sentence'?", golden_tools=["word_count"]),
-        QuerySpecification(query="Reverse this text: Python Experiment", golden_tools=["reverse_string"]),
-        QuerySpecification(query="Convert this to uppercase: llamastack", golden_tools=["uppercase"]),
-        QuerySpecification(query="Give me an insurance evaluation score", golden_tools=["insurance_scorer"])
-    ]
