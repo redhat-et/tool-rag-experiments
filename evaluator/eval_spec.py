@@ -30,8 +30,8 @@ PluginConfigSpec = Tuple[str, Dict[str, Any]]
 VERBOSE = False
 
 EVALUATED_ALGORITHMS: List[PluginConfigSpec] = [
-    ("no_tool_rag_baseline", {}),
-    # ("basic_tool_rag", {"top_k": 3, "embedding_model_id": "all-MiniLM-L6-v2"}),
+    # ("no_tool_rag_baseline", {}),
+    ("basic_tool_rag", {"top_k": 3, "embedding_model_id": "all-MiniLM-L6-v2"}),
 ]
 
 EXPERIMENTAL_ENVIRONMENT_SETTINGS: List[EvaluationEnvSpec] = [
