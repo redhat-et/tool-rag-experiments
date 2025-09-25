@@ -30,8 +30,8 @@ PluginConfigSpec = Tuple[str, Dict[str, Any]]
 VERBOSE = False
 
 EVALUATED_ALGORITHMS: List[PluginConfigSpec] = [
-    #("no_tool_rag_baseline", {}),
-    ("basic_tool_rag", {"top_k": 3, "embedding_model_id": "all-MiniLM-L6-v2"}),
+    ("no_tool_rag_baseline", {}),
+    # ("basic_tool_rag", {"top_k": 3, "embedding_model_id": "all-MiniLM-L6-v2"}),
 ]
 
 EXPERIMENTAL_ENVIRONMENT_SETTINGS: List[EvaluationEnvSpec] = [
@@ -84,6 +84,7 @@ MODEL_ID_TO_URL = {
     "Qwen/Qwen3-8B": os.getenv("QWEN_MODEL_URL"),
     "granite32-8b": os.getenv("GRANITE_MODEL_URL"),
     "AtlaAI/Selene-1-Mini-Llama-3.1-8B": os.getenv("SELENE_JUDGE_MODEL_URL"),
+    "llama3.1:8b-instruct-fp16": os.getenv("LLAMA_31_OLLAMA_URL"),
     # more models to be added if needed
 }
 
@@ -92,5 +93,6 @@ MODEL_ID_TO_PROVIDER_TYPE = {
     "Qwen/Qwen3-8B": "vllm",
     "granite32-8b": "vllm",
     "AtlaAI/Selene-1-Mini-Llama-3.1-8B": "vllm",
+    "llama3.1:8b-instruct-fp16": "ollama",
     # more models to be added if needed
 }

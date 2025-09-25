@@ -1,8 +1,6 @@
 import asyncio
 import logging
 import os
-import sys
-import threading
 import time
 from pathlib import Path
 from typing import List, Tuple
@@ -102,7 +100,7 @@ async def _run_experiment(exp_index: int,
     algorithm, environment = spec
 
     for i, query_spec in enumerate(queries):
-        print(f"Processing query #{query_spec.id} (Experiment {exp_index}, {i+1} of {len(queries)})...")
+        print(f"Processing query #{query_spec.id} (Experiment {exp_index}, query {i+1} of {len(queries)})...")
 
         for mc in metric_collectors:
             mc.prepare_for_measurement(query_spec)

@@ -23,7 +23,13 @@ def get_llm(model_id: str, **kwargs) -> BaseChatModel:
         return ChatOllama(model=model_id, base_url=model_url, **kwargs)
     if provider_id.lower() == "vllm":
         from langchain_openai import ChatOpenAI
-        return ChatOpenAI(openai_api_base=f"{model_url}/v1", openai_api_key="EMPTY", model=model_id, timeout=120, **kwargs)
+        return ChatOpenAI(
+            openai_api_base=f"{model_url}/v1",
+            openai_api_key="EMPTY",
+            model=model_id,
+            timeout=120,
+            **kwargs
+        )
     if provider_id.lower() == "openai":
         from langchain_openai import ChatOpenAI
         return ChatOpenAI(model=model_id, **kwargs)
