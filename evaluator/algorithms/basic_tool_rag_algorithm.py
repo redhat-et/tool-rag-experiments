@@ -190,7 +190,7 @@ class BasicToolRagAlgorithm(ToolRagAlgorithm):
     def _create_docs_from_tools(self, tools: List[BaseTool]) -> List[Document]:
         documents = []
         for tool in tools:
-            page_content = self._preprocess_text(tool.description)
+            page_content = self._compose_tool_text(tool)
             documents.append(Document(page_content=page_content, metadata={"name": tool.name}))
         return documents
 
