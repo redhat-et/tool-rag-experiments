@@ -6,6 +6,8 @@ import numpy as np
 
 from typing import List, Dict, Tuple, Any
 from langchain.docstore.document import Document
+from langchain.retrievers.document_compressors import CrossEncoderReranker
+from langchain_community.cross_encoders import HuggingFaceCrossEncoder
 from langchain_huggingface import HuggingFaceEmbeddings
 
 from langchain_core.language_models import BaseChatModel
@@ -46,11 +48,15 @@ DEFAULT_SETTINGS = {
     "indexed_tool_def_parts": ["name", "description"],
 
     # hybrid search
-    "hybrid_search": False,
+    "hybrid_mode": False,
     "analyzer_params": None,
     "fusion_type": "rrf",
     "fusion_k": 100,
     "fusion_alpha": 0.5,
+
+    # reranking
+    "cross_encoder_model_name": "BAAI/bge-reranker-large",
+    "reranker_pool_size": 50,
 }
 
 if not VERBOSE:
@@ -99,10 +105,14 @@ class BasicToolRagAlgorithm(ToolRagAlgorithm):
     - fusion_alpha: the relative weight of the dense retriever score. The final score is calculated as
       alpha*dense + (1-alpha)*sparse. This parameter is only used with the "weighted" fusion type.
     - fusion_k: the k value to use for the "rrf" hybrid fusion mode.
+    - cross_encoder_model_name: the name of the model to use for reranking or None to disable reranking.
+    - reranker_pool_size: the number of results to retrieve from the vector DB before reranking. Must be greater than or
+      equal to top_k.
     """
 
     model: BaseChatModel or None
     vector_store: Milvus or None
+    reranker: CrossEncoderReranker or None
 
     # due to the limitations of Langchain tools we cannot truly serialize them. Therefore, indexing
     # the tools themselves is not possible. Instead, we keep all tools in memory and only index their unique IDs (names)
@@ -117,6 +127,7 @@ class BasicToolRagAlgorithm(ToolRagAlgorithm):
         self.model = None
         self.tool_name_to_base_tool = None
         self.vector_store = None
+        self.reranker = None
 
     def _preprocess_text(self, text: str) -> str:
         ops = self._settings["text_preprocessing_operations"]
@@ -267,6 +278,13 @@ class BasicToolRagAlgorithm(ToolRagAlgorithm):
 
     def set_up(self, model: BaseChatModel, tools: List[BaseTool]) -> None:
         self.model = model
+
+        if self._settings["cross_encoder_model_name"]:
+            self.reranker = CrossEncoderReranker(
+                model=HuggingFaceCrossEncoder(model_name=self._settings["cross_encoder_model_name"]),
+                top_n=self._settings["top_k"],
+            )
+
         self._index_tools(tools)
 
     def _threshold_results(self, docs_and_scores: List[Tuple[Document, float]]) -> List[Document]:
@@ -290,6 +308,22 @@ class BasicToolRagAlgorithm(ToolRagAlgorithm):
             raise ValueError(f"Unknown metric: {metric}")
         return [d for (d, s) in kept]
 
+    def _postprocess_results(self, docs_and_scores: List[Tuple[Document, float]], query: str) -> List[Document]:
+        """
+        Optionally filters and/or reranks results from the vector DB search.
+        """
+        if self._settings["tau"] is not None:
+            # tau is specified - thresholding is enabled
+            docs = self._threshold_results(docs_and_scores)
+        else:
+            docs = [d for (d, s) in docs_and_scores]
+
+        if not self._settings["cross_encoder_model_name"]:
+            # reranking is disabled - nothing else to do
+            return docs
+
+        return self.reranker.compress_documents(docs, query)
+
     async def process_query(self, query_spec: QuerySpecification) -> AlgoResponse:
         if not self.vector_store:
             raise RuntimeError("process_query called before set_up")
@@ -310,13 +344,15 @@ class BasicToolRagAlgorithm(ToolRagAlgorithm):
             hybrid_fusion_type = None
             hybrid_fusion_params = None
 
+        # if reranking is enabled, we have to retrieve more results than without reranking
+        actual_k = self._settings["reranker_pool_size"] if self.reranker is not None else self._settings["top_k"]
         docs_and_scores = self.vector_store.similarity_search_with_score(
             query_text,
-            k=self._settings["top_k"],
+            k=actual_k,
             ranker_type=hybrid_fusion_type,
             ranker_params=hybrid_fusion_params,
         )
-        relevant_documents = self._threshold_results(docs_and_scores)
+        relevant_documents = self._postprocess_results(docs_and_scores, query_text)
         relevant_tool_names = [d.metadata["name"] for d in relevant_documents]
 
         print_verbose(f"Retrieved tools for query #{query_spec.id}: {relevant_tool_names}")
