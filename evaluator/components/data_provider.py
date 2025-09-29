@@ -3,6 +3,7 @@ import json
 import math
 import os
 import random
+from json import JSONDecodeError
 from typing import List, Dict, Any, Optional, Tuple
 from pathlib import Path
 
@@ -280,7 +281,11 @@ def _load_reference_answer(root_dir: Path, model_name: str or None, query_id: in
                     # the reference answer for this query is not available
                     return None
 
-                inner = json.loads(outer_final)  # parse the stringified JSON
+                try:
+                    inner = json.loads(outer_final)  # parse the stringified JSON
+                except JSONDecodeError:
+                    # the final answer JSON is invalid
+                    return None
                 if "final_answer" not in inner:
                     raise ValueError(
                         f'Inner JSON in {candidate_path} is missing "final_answer".'

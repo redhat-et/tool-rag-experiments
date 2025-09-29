@@ -10,7 +10,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.tools import BaseTool
-from langchain_milvus import Milvus
+from langchain_milvus import Milvus, BM25BuiltInFunction
 from langgraph.prebuilt import create_react_agent
 from pymilvus import connections, utility
 
@@ -35,6 +35,7 @@ OVERRIDE_COLLECTION = True
 
 
 DEFAULT_SETTINGS = {
+    # basic
     "top_k": 3,
     "embedding_model_id": "all-MiniLM-L6-v2",
     "similarity_metric": "COSINE",
@@ -43,6 +44,13 @@ DEFAULT_SETTINGS = {
     "text_preprocessing_operations": None,
     "max_document_size": None,
     "indexed_tool_def_parts": ["name", "description"],
+
+    # hybrid search
+    "hybrid_search": False,
+    "analyzer_params": None,
+    "fusion_type": "rrf",
+    "fusion_k": 100,
+    "fusion_alpha": 0.5,
 }
 
 if not VERBOSE:
@@ -84,6 +92,13 @@ class BasicToolRagAlgorithm(ToolRagAlgorithm):
     - max_document_size: the maximal size, in characters, of a single indexed document, or None to disable the size limit.
     - indexed_tool_def_parts: the parts of the MCP tool definition to be used for index construction, such as 'name',
       'description', 'args', etc.
+    - hybrid_mode: True to enable hybrid (sparse + dense) search and False to only enable dense search.
+    - analyzer_params: parameters for the Milvus BM25 analyzer.
+    - fusion_type: the algorithm for combining the dense and the sparse scores if hybrid mode is activated. Milvus only
+      supports "weighted" and "rrf".
+    - fusion_alpha: the relative weight of the dense retriever score. The final score is calculated as
+      alpha*dense + (1-alpha)*sparse. This parameter is only used with the "weighted" fusion type.
+    - fusion_k: the k value to use for the "rrf" hybrid fusion mode.
     """
 
     model: BaseChatModel or None
@@ -224,15 +239,31 @@ class BasicToolRagAlgorithm(ToolRagAlgorithm):
             )
 
         print_verbose(f"Creating new Milvus collection on the server: {COLLECTION_NAME}")
-        self.vector_store = Milvus.from_documents(
-            documents=self._create_docs_from_tools(tools),
-            embedding=embeddings,
-            collection_name=COLLECTION_NAME,
-            connection_args={"uri": milvus_uri},
-            drop_old=True,
-            index_params=index_params,
-            search_params=search_params,
-        )
+        if self._settings["hybrid_mode"]:
+            # index and search parameters must be extended for sparse search
+            index_params = [index_params, None]
+            search_params = [search_params, {}]
+            self.vector_store = Milvus.from_documents(
+                documents=self._create_docs_from_tools(tools),
+                embedding=embeddings,
+                collection_name=COLLECTION_NAME,
+                connection_args={"uri": milvus_uri},
+                drop_old=True,
+                index_params=index_params,
+                search_params=search_params,
+                builtin_function=BM25BuiltInFunction(analyzer_params=self._settings["analyzer_params"]),
+                vector_field=["dense", "sparse"],
+            )
+        else:
+            self.vector_store = Milvus.from_documents(
+                documents=self._create_docs_from_tools(tools),
+                embedding=embeddings,
+                collection_name=COLLECTION_NAME,
+                connection_args={"uri": milvus_uri},
+                drop_old=True,
+                index_params=index_params,
+                search_params=search_params,
+            )
 
     def set_up(self, model: BaseChatModel, tools: List[BaseTool]) -> None:
         self.model = model
@@ -266,7 +297,25 @@ class BasicToolRagAlgorithm(ToolRagAlgorithm):
         print_verbose(f"Retrieving documents for query: {query_spec.query}")
         query_text = self._preprocess_text(query_spec.query)
 
-        docs_and_scores = self.vector_store.similarity_search_with_score(query_text, k=self._settings["top_k"])
+        if self._settings["hybrid_mode"]:
+            hybrid_fusion_type = self._settings["fusion_type"]
+            if hybrid_fusion_type == "weighted":
+                alpha = self._settings["fusion_alpha"]
+                hybrid_fusion_params = {"weights": [alpha, 1 - alpha]}
+            elif hybrid_fusion_type == "rrf":
+                hybrid_fusion_params = {"k": self._settings["fusion_k"]}
+            else:
+                raise ValueError(f"Unsupported hybrid fusion type: {hybrid_fusion_type}")
+        else:
+            hybrid_fusion_type = None
+            hybrid_fusion_params = None
+
+        docs_and_scores = self.vector_store.similarity_search_with_score(
+            query_text,
+            k=self._settings["top_k"],
+            ranker_type=hybrid_fusion_type,
+            ranker_params=hybrid_fusion_params,
+        )
         relevant_documents = self._threshold_results(docs_and_scores)
         relevant_tool_names = [d.metadata["name"] for d in relevant_documents]
 
