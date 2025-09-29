@@ -1,0 +1,258 @@
+[
+  {
+    "tool_name": "Java Code Compiler",
+    "query": "Hey, I'm new to Java programming and I'm not sure which version to use. Could you give me a list of Java versions and their names? It would be really helpful for me to get started."
+  },
+  {
+    "tool_name": "PurgoMalum",
+    "query": "I have a document that needs to be checked for profanity. Can you remove any profane words from the text and replace them with asterisks? Also, please let me know if the document contains any profanity."
+  },
+  {
+    "tool_name": "QR Code API_v33",
+    "query": "My friend is organizing a virtual event and wants to share the event details using a QR code. Can you help generate a QR code image for the event information? The event details can be provided as a string."
+  },
+  {
+    "tool_name": "GUID generator",
+    "query": "I am working on a project that requires unique IDs for each document. Can you assist me in generating GUIDs for the documents? I would need 50 GUIDs in total."
+  },
+  {
+    "tool_name": "Advanced Movie Search",
+    "query": "I'm a movie enthusiast and I'm looking for recommendations. Can you help me discover movies from different genres? It would be great if you could provide the movie details such as the title, overview, release date, and average vote."
+  },
+  {
+    "tool_name": "OTT details",
+    "query": "I want to find a specific movie but I only remember the title 'Inception'. Can you help me search for the movie 'Inception' and provide me with its details, including the genre, runtime, IMDb rating, and streaming availability?"
+  },
+  {
+    "tool_name": "Ubidots",
+    "query": "I need to retrieve the list of variables for my data source with ID 'abc123'. Additionally, I want to obtain the details of the variable with ID 'xyz789'."
+  },
+  {
+    "tool_name": "IoTVAS",
+    "query": "My company is planning to deploy IoT devices and we want to ensure their security. Can you analyze the firmware of these devices and provide a risk assessment? It would be helpful to check for weak certificates, expired certificates, and weak keys. Thank you!"
+  },
+  {
+    "tool_name": "Captcha",
+    "query": "My friend is developing a website and needs help with captcha verification. Can you assist him in generating a captcha image and a UUID? Additionally, please verify if the user entered the correct captcha by checking the captcha text and UUID."
+  },
+  {
+    "tool_name": "ColorMe",
+    "query": "I am planning a wedding and I need some color inspiration. Can you generate a random set of colors for the wedding theme? Additionally, I would like to see a specific color set based on the input color 'pink'. Thank you!"
+  },
+  {
+    "tool_name": "MlemAPI",
+    "query": "I'm writing an article about the cutest animal expressions and I need some visual examples. Can you provide me with a random mlem image with a dark brightness and portrait orientation? Also, please include the tags associated with the image."
+  },
+  {
+    "tool_name": "ProxyPage",
+    "query": "My family is planning a vacation to multiple countries. We need proxies to access geo-restricted content. Can you suggest proxies with low latency and anonymity for our HTTP connections?"
+  },
+  {
+    "tool_name": "👋 Onboarding Project_v3",
+    "query": "Can you fetch the details of my recent orders? I would like to know the products I ordered, the order status, and the delivery date."
+  },
+  {
+    "tool_name": "Movie, TV, music search and download",
+    "query": "Can you search for the top 40 movie torrents with the keywords 'science fiction' and 'thriller'? Additionally, give me the monthly top 100 TV-show torrents."
+  },
+  {
+    "tool_name": "Reword PDF",
+    "query": "I'm analyzing the content of a PDF document. I need to retrieve all the texts in the PDF, along with their corresponding page numbers. Additionally, I would like to extract the texts on a specific page. Can you assist me with these tasks?"
+  },
+  {
+    "tool_name": "IMDB_API",
+    "query": "My friends and I are planning a movie night and we want to watch movies released in 2020. Can you suggest some good movies from that year? We would like to see the title, director, cast, and rating for each movie. Appreciate your help!"
+  },
+  {
+    "tool_name": "Judge0 Extra CE",
+    "query": "I'm a software developer and I'm interested in using Judge0 for my projects. Can you give me an overview of the available languages? Additionally, I would like to know the source file and run command for the language with ID 10."
+  },
+  {
+    "tool_name": "YouTube Video Summarizer",
+    "query": "I'm interested in summarizing YouTube videos. Is there a tool available that can provide me with the summarized content in markdown format? It would be helpful if the tool could also fetch the video title, author, and ID."
+  },
+  {
+    "tool_name": "Bulk WHOIS",
+    "query": "I'm curious about the WHOIS information for a specific domain. Can you perform a WHOIS query for the domain 'example.com' and provide the information in formatted lines? Also, please retrieve a list of all my WHOIS batches."
+  },
+  {
+    "tool_name": "USA Jobs for IT",
+    "query": "My cousin is a react developer and looking for job opportunities in that field. Can you help me find react job openings? Additionally, I'm also interested in exploring data engineer positions. Can you provide me with a list of available data engineer jobs?"
+  },
+  {
+    "tool_name": "👋 Demo Project_v13",
+    "query": "I want to explore the catalog of products available in the 'Electronics' category. Please provide me with the list of products along with their details."
+  },
+  {
+    "tool_name": "dimondevosint",
+    "query": "I'm concerned about a phone number that has been calling me several times. Can you help me identify the caller? I need the photo associated with the phone number +447800123456 and any public information you can find."
+  },
+  {
+    "tool_name": "Text to speech",
+    "query": "I need to send a text to the text-to-speech API and get the speech output in English. Can you help me with this task? I want to make sure the API supports the English language."
+  },
+  {
+    "tool_name": "Aspose.Imaging Cloud",
+    "query": "I have an image named 'photo.jpg' and I want to rotate it 90 degrees clockwise and flip it vertically. Can you also save it in the 'edited_images' folder?"
+  },
+  {
+    "tool_name": "OTT details",
+    "query": "I'm a movie critic and I need to write reviews for the latest movies. Can you provide me with a list of new arrivals on different platforms? It would be great if you could include the streaming platforms and the genres for each movie."
+  },
+  {
+    "tool_name": "Bing Video Search",
+    "query": "I am working on a project and need to gather insights about a specific video. The video ID is '12345'. Can you provide me with the video details and related videos for this video?"
+  },
+  {
+    "tool_name": "Movie and TV shows Quotes",
+    "query": "I'm a film student and I'm researching quotes from movies released in the year 1939. Can you fetch me quotes from movies released in that year? It would be helpful if you can provide the character names and the actors who delivered these quotes."
+  },
+  {
+    "tool_name": "MoviesDatabase",
+    "query": "I am a movie critic and I need to gather information about multiple movies. The IMDb IDs of the movies are tt1234567, tt9876543, tt2468135. Can you provide me with the base information for these movies?"
+  },
+  {
+    "tool_name": "MoviesDatabase",
+    "query": "Can you provide me with the details of the movies with the IMDb IDs tt1234567, tt9876543, and tt2468024? Additionally, give me the crew details and additional information for each movie."
+  },
+  {
+    "tool_name": "👋 Onboarding Project_v3",
+    "query": "I want to check the status of my recent order. Can you fetch the details of my order, including the order status and delivery date?"
+  },
+  {
+    "tool_name": "👋 Onboarding Project_v3",
+    "query": "I want to check the status of my recent order. Can you fetch the details of my order, including the order status and delivery date?"
+  },
+  {
+    "tool_name": "Domain Checker",
+    "query": "Please check if the domain 'example.com' is registered and valid. If it is registered, provide me with the DNS records and Whois details."
+  },
+  {
+    "tool_name": "SEO Checker",
+    "query": "My friend is working on a website project and wants to optimize its performance. Can you analyze the page speed and provide suggestions for improvement? It would be great to receive details on unused JavaScript, network round trip time, and offscreen images. Thanks!"
+  },
+  {
+    "tool_name": "Flaticon",
+    "query": "Could you provide me with the total number of icons available at Flaticon? Additionally, I would like to search for packs related to the topic of 'education' and order the results by priority."
+  },
+  {
+    "tool_name": "Transportistas de Argentina",
+    "query": "I'm planning to send a package through Correo Argentino. Can you provide a list of cities in Argentina along with their state ISO codes? Additionally, I need to know the list of offices near the source postcode '54321'."
+  },
+  {
+    "tool_name": "Judge0 Extra CE",
+    "query": "As a developer, I am interested in the current status of Judge0 Extra CE. Can you provide me with the status descriptions and the configuration information? It would be helpful for me to know the maintenance mode status, CPU time limit, and memory limit."
+  },
+  {
+    "tool_name": "C Code Compiler",
+    "query": "Recommend the best version of C to compile my C code. I want to ensure compatibility and efficiency. Thank you in advance!"
+  },
+  {
+    "tool_name": "Cars image background removal",
+    "query": "I'm planning to create a car-themed poster and I need to remove the background from car images. Can you please provide me with the available modes for background removal in the Cars Image Background Removal tool? Also, I would like to know the current version of the tool to ensure I am using the latest features."
+  },
+  {
+    "tool_name": "OTT details",
+    "query": "I'm a movie critic and I need to write reviews for the latest movies. Can you provide me with a list of new arrivals on different platforms? It would be great if you could include the streaming platforms and the genres for each movie."
+  },
+  {
+    "tool_name": "Transportistas de Argentina",
+    "query": "I'm planning to send a package through Correo Argentino. Can you provide a list of cities in Argentina along with their state ISO codes? Additionally, I need to know the list of offices near the source postcode '54321'."
+  },
+  {
+    "tool_name": "Ubidots",
+    "query": "My friend is working on a research project that involves analyzing sensor data. Can you help her retrieve the variables of a specified data source and provide the details of each variable, including the last value written to it? Furthermore, fetch the values of a specific variable along with their timestamps?"
+  },
+  {
+    "tool_name": "Judge0 Extra CE",
+    "query": "I'm interested in using Judge0 Extra CE for my coding needs. Can you provide me with the general information, configuration information, active languages, and statuses? It would be helpful to know the version, homepage, source code, maintainer, maintenance mode, enable wait result, enable compiler options, allowed languages for compile options, enable command line arguments, enable submission delete, enable callbacks, callbacks max tries, callbacks timeout, enable additional files, max queue size, cpu time limit, max cpu time limit, cpu extra time, max cpu extra time, wall time limit, max wall time limit, memory limit, max memory limit, stack limit, max stack limit, max processes and/or threads, max max processes and/or threads, enable per process and thread time limit, allow enable per process and thread time limit, enable per process and thread memory limit, allow enable per process and thread memory limit, max file size, max max file size, language IDs, language names, status IDs, and descriptions."
+  },
+  {
+    "tool_name": "oDesk APIs",
+    "query": "I need to retrieve the details of specific tasks assigned to my team and generate time reports for a specific team. Please provide the task codes 12, 23, and 34 along with the team ID 45678. The format of the response should be in CSV."
+  },
+  {
+    "tool_name": "YouTube Video Summarizer",
+    "query": "I would like a markdown summary of the YouTube video 'How to Paint a Landscape' by Jane Smith. The video URL is 'https://www.youtube.com/watch?v=Yzx7ihtCGBs'."
+  },
+  {
+    "tool_name": "OTT details",
+    "query": "I'm hosting a movie marathon and I need recommendations for horror movies with a minimum IMDb rating of 7. Can you provide me with a list of titles, their release years, and synopses?"
+  },
+  {
+    "tool_name": "Cryptocurrency News",
+    "query": "I'm interested in the latest news about cryptocurrencies and want to know what's happening in the industry. Can you fetch the top articles from CoinDesk, BSC News, and Decrypt? Please include the article titles, descriptions, thumbnails, and publication dates."
+  },
+  {
+    "tool_name": "secure-text-api",
+    "query": "I'm looking for a tool to secure my confidential data. Can you suggest an API that generates public and private keys for encrypting and decrypting text? It would be helpful if the API also provides a verification code for the keys."
+  },
+  {
+    "tool_name": "suivi-colis",
+    "query": "I want to see the complete history of the package CA107308006SI, from its shipment to the current status. Can you provide me with all the details? Also, I would like to know the latest information and location of the package."
+  },
+  {
+    "tool_name": "suivi-colis",
+    "query": "My company needs to monitor the progress of multiple packages. Can you help us count the number of steps in the history for each package? This will allow us to optimize our resources and network consumption."
+  },
+  {
+    "tool_name": "Aspose.Imaging Cloud",
+    "query": "I have an image named 'photo.jpg' and I want to rotate it 90 degrees clockwise and flip it vertically. Can you also save it in the 'edited_images' folder?"
+  },
+  {
+    "tool_name": "QR Code - Dynamic and Static",
+    "query": "My company is organizing an event and we need to create unique QR codes for each attendee. Can you generate multiple dynamic QR codes for this purpose? Additionally, provide me with the details of all the QR codes linked to my API key."
+  },
+  {
+    "tool_name": "api.video",
+    "query": "My company is planning to host live streams and we need to choose a player. Can you provide us with the available players? Display them on the first page with 20 items per page, sorted by their creation date in ascending order."
+  },
+  {
+    "tool_name": "MoviesDatabase",
+    "query": "Can you provide me with the details of the movies with the IMDb IDs tt1234567, tt9876543, and tt2468024? Additionally, give me the crew details and additional information for each movie."
+  },
+  {
+    "tool_name": "Torrent-Search",
+    "query": "I'm organizing a movie marathon for my family this weekend and I need a list of family-friendly movies. Can you search for movies suitable for all ages on YTS and 1337x? Please provide movie names, genres, and available torrents."
+  },
+  {
+    "tool_name": "TrackingMore_v2",
+    "query": "I'm curious about the supported carriers for international shipping. Can you provide me with the list? Also, I want to track a package with the tracking number NY323068698GB. Can you give me the tracking information?"
+  },
+  {
+    "tool_name": "QR Code Generator",
+    "query": "I'm planning a surprise birthday party for my friend and I want to create personalized QR codes for the invitations. Can you generate QR codes as base64 images with individual labels for each guest? It would be great if the QR codes could be customized with different foreground and background colors."
+  },
+  {
+    "tool_name": "UUID generator",
+    "query": "My company is building an online platform that requires creating unique identifiers for various entities. Can you suggest an API that can generate UUIDv5 using the 'dns' namespace and the entity name as 'www.example.com'? Furthermore, we need to generate a UUIDv4 for internal tracking purposes."
+  },
+  {
+    "tool_name": "MoviesDatabase",
+    "query": "I am a movie critic and I need to gather information about multiple movies. The IMDb IDs of the movies are tt1234567, tt9876543, tt2468135. Can you provide me with the base information for these movies?"
+  },
+  {
+    "tool_name": "Domain Name Search",
+    "query": "I am looking for a domain name for my new business. Can you check the availability of the domain 'mybusinessname.com'? If it's available, provide me with the WHOIS information for the domain and the pricing details."
+  },
+  {
+    "tool_name": "Transportistas de Argentina",
+    "query": "I'm starting an e-commerce business in Argentina and need to track the shipping status of my orders. Can you help me create a tracking task for a package with the tracking code '123456789' using the Correo Argentino service? I want to retrieve the result for this task."
+  },
+  {
+    "tool_name": "Bing Video Search",
+    "query": "I'm working on a research project and need to find videos related to a specific topic. Can you help me with that? I would like to search for videos relevant to my query using the Video Search API. It would also be helpful to get insights about a video, such as related videos, using the Video Details API."
+  },
+  {
+    "tool_name": "👋 Demo Project_v13",
+    "query": "I want to explore the catalog of products available in the 'Electronics' category. Please provide me with the list of products along with their details."
+  },
+  {
+    "tool_name": "Ubidots",
+    "query": "My friend is working on a research project that involves analyzing sensor data. Can you help her retrieve the variables of a specified data source and provide the details of each variable, including the last value written to it? Furthermore, fetch the values of a specific variable along with their timestamps?"
+  },
+  {
+    "tool_name": "Image",
+    "query": "I'm developing a photo editing app and I want to offer users the option to apply a charcoal filter to their images. Is there an API that can apply a charcoal effect to images? Additionally, I'd like to provide a 'wasted' effect where an image is distorted and overlaid with text. Is there an API that can help with that?"
+  }
+]
