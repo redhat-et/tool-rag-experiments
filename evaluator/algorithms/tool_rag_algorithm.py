@@ -100,7 +100,7 @@ class L2Wrapper:
         return x.tolist()
 
 
-@register_tool_rag_algorithm("basic_tool_rag")
+@register_tool_rag_algorithm("tool_rag")
 class BasicToolRagAlgorithm(ToolRagAlgorithm):
     """
     Optional configurable settings (to be provided in the 'settings' dictionary):
