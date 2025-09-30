@@ -347,13 +347,13 @@ def _load_queries_from_single_file(
     return queries
 
 
-def get_queries(experiment_environment: EvaluationEnvSpec) -> List[QuerySpecification]:
+def get_queries(experiment_environment: EvaluationEnvSpec, fine_tuning_mode=False) -> List[QuerySpecification]:
     """Load queries from the dataset."""
     root_dataset_path = Path(os.getenv("ROOT_DATASET_PATH"))
     if not root_dataset_path:
         raise ValueError(f"⚠️ Root dataset folder not configured, using fallback queries.")
 
-    remote_query_files = DATASET_SETTINGS["query_files"]
+    remote_query_files = DATASET_SETTINGS["fine_tuning_query_files"] if fine_tuning_mode else DATASET_SETTINGS["query_files"]
     if not remote_query_files:
         raise ValueError(f"⚠️ Query files not configured properly, using fallback queries.")
 
@@ -361,10 +361,10 @@ def get_queries(experiment_environment: EvaluationEnvSpec) -> List[QuerySpecific
     local_paths = fetch_remote_paths(remote_query_files, root_dataset_path)
 
     # Actually load the queries
+    queries_num = None if fine_tuning_mode else DATASET_SETTINGS["queries_num"]
     queries = []
     for path in local_paths:
-        remaining_queries_num = \
-            None if DATASET_SETTINGS["queries_num"] is None else DATASET_SETTINGS["queries_num"] - len(queries)
+        remaining_queries_num = None if queries_num is None else queries_num - len(queries)
         if remaining_queries_num == 0:
             break
         new_queries = _load_queries_from_single_file(path,

@@ -62,6 +62,12 @@ DATASET_SETTINGS: Dict[str, Any] = {
         "https://raw.githubusercontent.com/THUNLP-MT/StableToolBench/refs/heads/master/solvable_queries/test_instruction/G1_tool.json",
     ],
 
+    "fine_tuning_query_files": [
+        "https://raw.githubusercontent.com/THUNLP-MT/StableToolBench/refs/heads/master/solvable_queries/test_instruction/G2_category.json",
+        "https://raw.githubusercontent.com/THUNLP-MT/StableToolBench/refs/heads/master/solvable_queries/test_instruction/G2_instruction.json",
+        "https://raw.githubusercontent.com/THUNLP-MT/StableToolBench/refs/heads/master/solvable_queries/test_instruction/G3_instruction.json",
+    ],
+
     # URLs of the files to fetch the tools from.
     # Will only be downloaded if not already available locally.
     # As of now, providing more than one path is not supported!
@@ -83,6 +89,7 @@ MODEL_ID_TO_URL = {
     "meta-llama/Llama-3.1-8B-Instruct": os.getenv("LLAMA_31_MODEL_URL"),
     "Qwen/Qwen3-8B": os.getenv("QWEN_MODEL_URL"),
     "granite32-8b": os.getenv("GRANITE_MODEL_URL"),
+    "llama32-3b": os.getenv("LLAMA_32_MODEL_URL"),
     "AtlaAI/Selene-1-Mini-Llama-3.1-8B": os.getenv("SELENE_JUDGE_MODEL_URL"),
     "llama3.1:8b-instruct-fp16": os.getenv("LLAMA_31_OLLAMA_URL"),
     # more models to be added if needed
@@ -92,6 +99,7 @@ MODEL_ID_TO_PROVIDER_TYPE = {
     "meta-llama/Llama-3.1-8B-Instruct": "vllm",
     "Qwen/Qwen3-8B": "vllm",
     "granite32-8b": "vllm",
+    "llama32-3b": "vllm",
     "AtlaAI/Selene-1-Mini-Llama-3.1-8B": "vllm",
     "llama3.1:8b-instruct-fp16": "ollama",
     # more models to be added if needed
