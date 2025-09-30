@@ -1,6 +1,10 @@
+import json
+import math
 import os
 import re
 import unicodedata
+from itertools import chain
+from json import JSONDecodeError
 
 import numpy as np
 
@@ -17,6 +21,7 @@ from langgraph.prebuilt import create_react_agent
 from pymilvus import connections, utility
 
 from evaluator.components.data_provider import QuerySpecification
+from evaluator.components.llm_provider import get_llm, query_llm
 from evaluator.eval_spec import VERBOSE
 from evaluator.utils.module_extractor import register_tool_rag_algorithm
 from evaluator.interfaces.tool_rag_algorithm import ToolRagAlgorithm, AlgoResponse
@@ -55,8 +60,16 @@ DEFAULT_SETTINGS = {
     "fusion_alpha": 0.5,
 
     # reranking
-    "cross_encoder_model_name": "BAAI/bge-reranker-large",
+    "cross_encoder_model_name": None,  # "BAAI/bge-reranker-large",
     "reranker_pool_size": 50,
+
+    # query rewriting / decomposition
+    "enable_query_decomposition": False,
+    "enable_query_rewriting": False,
+    "query_rewriting_model_id": "llama32-3b",
+    "min_sub_tasks": 1,
+    "max_sub_tasks": 5,
+    "query_rewrite_tool_suggestions_num": 3,
 }
 
 if not VERBOSE:
@@ -88,7 +101,7 @@ class BasicToolRagAlgorithm(ToolRagAlgorithm):
     Optional configurable settings (to be provided in the 'settings' dictionary):
 
     - top_k: the number of documents to retrieve on a given query.
-    - embedding_model_id: the ID of a model to use for embedding calculation.
+    - embedding_model_id: the ID of the model to use for embedding calculation.
     - similarity_metric: the metric to use for embedding distance calculation - can be COSINE, L2 or IP (inner product).
     - index_type: the type of Milvus index to build - can be FLAT, HNSW, IVF_FLAT or any other supported type.
     - tau: an optional threshold between 0 and 1 to filter the retrieved documents post-search (None to disable filtering).
@@ -108,11 +121,18 @@ class BasicToolRagAlgorithm(ToolRagAlgorithm):
     - cross_encoder_model_name: the name of the model to use for reranking or None to disable reranking.
     - reranker_pool_size: the number of results to retrieve from the vector DB before reranking. Must be greater than or
       equal to top_k.
+    - enable_query_decomposition: True to enable query decomposition into subtasks and False otherwise.
+    - enable_query_rewriting: True to enable (sub-)query rewriting into a list of relevant APIs and False otherwise.
+    - query_rewriting_model_id: the ID of the model to use for query rewriting and decomposition.
+    - min_sub_tasks: the minimum number of tasks to decompose the original query into.
+    - max_sub_tasks: the maximum number of tasks to decompose the original query into.
+    - query_rewrite_tool_suggestions_num: the maximal number of tool APIs to produce from the original query during rewriting.
     """
 
     model: BaseChatModel or None
     vector_store: Milvus or None
     reranker: CrossEncoderReranker or None
+    query_rewriting_model: BaseChatModel or None
 
     # due to the limitations of Langchain tools we cannot truly serialize them. Therefore, indexing
     # the tools themselves is not possible. Instead, we keep all tools in memory and only index their unique IDs (names)
@@ -128,6 +148,7 @@ class BasicToolRagAlgorithm(ToolRagAlgorithm):
         self.tool_name_to_base_tool = None
         self.vector_store = None
         self.reranker = None
+        self.query_rewriting_model = None
 
     def _preprocess_text(self, text: str) -> str:
         ops = self._settings["text_preprocessing_operations"]
@@ -285,6 +306,9 @@ class BasicToolRagAlgorithm(ToolRagAlgorithm):
                 top_n=self._settings["top_k"],
             )
 
+        if self._settings["enable_query_decomposition"] or self._settings["enable_query_rewriting"]:
+            self.query_rewriting_model = get_llm(self._settings["query_rewriting_model_id"])
+
         self._index_tools(tools)
 
     def _threshold_results(self, docs_and_scores: List[Tuple[Document, float]]) -> List[Document]:
@@ -324,12 +348,107 @@ class BasicToolRagAlgorithm(ToolRagAlgorithm):
 
         return self.reranker.compress_documents(docs, query)
 
-    async def process_query(self, query_spec: QuerySpecification) -> AlgoResponse:
-        if not self.vector_store:
-            raise RuntimeError("process_query called before set_up")
+    def _decompose_query(self, query: str) -> List[str]:
+        """
+        Decomposes a given, possibly highly complex query into a list of simpler subtasks.
+        """
+        system_prompt = "You are a helpful assistant."
 
-        print_verbose(f"Retrieving documents for query: {query_spec.query}")
-        query_text = self._preprocess_text(query_spec.query)
+        user_prompt = (
+            "Split the USER REQUEST provided below into atomic, simple subtasks. "
+            "Each subtask should map to a single API/tool call. "
+            f"Produce between {self._settings['min_sub_tasks']} and {self._settings['max_sub_tasks']} subtasks. "
+            f"Subtasks should be written in imperative style and contain at most 25 words."
+            f"Merge near-duplicates. "
+            f"Skip steps that do not require a tool. "
+            f"Return JSON: {{\"subtasks\": [\"...\"]}}"
+            f"USER REQUEST:\n {query}\n"
+        )
+
+        raw = query_llm(self.query_rewriting_model, system_prompt, user_prompt)
+        parsed = self._safe_json_parse(raw)
+        if isinstance(parsed, dict) and isinstance(parsed.get("subtasks"), list):
+            items = [str(x) for x in parsed["subtasks"]]
+        else:
+            # fallback to line-by-line if JSON wasn't returned
+            items = self._lines(raw)
+
+        steps: List[str] = []
+        for s in items:
+            s = self._strip_numbering(s)
+            if not s:
+                continue
+            steps.append(s)
+            if len(steps) >= self._settings['max_sub_tasks']:
+                break
+
+        steps = self._dedup_keep_order(steps)
+        if not steps:
+            steps = [query]
+
+        return steps
+
+    def _rewrite_query_to_tool_descriptions(self, query: str) -> List[str]:
+        """
+        Transforms a query into a list of hypothetical tool APIs required to complete it.
+        """
+        system_prompt = "You are a helpful assistant."
+
+        num_tools = self._settings['query_rewrite_tool_suggestions_num']
+        user_prompt = (
+            f"Generate short descriptions of API(s) that can be used to address USER REQUEST as specified below. "
+            f"Each description must be concise and phrased like a capability (not an answer). "
+            f"Do NOT answer the user. "
+            f"Write up to {num_tools} short descriptions. "
+            f"Each description should contain at most 25 words. "
+            f"Output one description per line."
+            f"USER REQUEST:\n {query}\n"
+        )
+
+        raw = query_llm(self.query_rewriting_model, system_prompt, user_prompt)
+        items = self._lines(raw)[:max(1, num_tools)]
+        items = self._dedup_keep_order([s for s in items if s])
+
+        return items
+
+    @staticmethod
+    def _merge_tool_docs(
+            tool_docs_with_scores_lists: List[List[Tuple[Document, float]]]) -> List[Tuple[Document, float]]:
+        merged = []
+
+        for doc, score in chain.from_iterable(tool_docs_with_scores_lists):
+            # Find if an equal document already exists in the merged list
+            idx = next((i for i, (d, _) in enumerate(merged) if d.metadata["name"] == doc.metadata["name"]), None)
+
+            if idx is None:
+                merged.append((doc, score))
+            else:
+                # Keep the higher score
+                if score > merged[idx][1]:
+                    merged[idx] = (doc, score)
+
+        merged.sort(key=lambda pair: pair[1], reverse=True)
+        return merged
+
+    async def _get_tools_for_sub_query(self, query: str, k: int) -> List[Tuple[Document, float]]:
+        if not self._settings["enable_query_rewriting"]:
+            # just fetch the tools from the DB based on the query text
+            return await self._fetch_tools_for_sub_query_from_vector_db(query, k)
+
+        tool_descriptions = self._rewrite_query_to_tool_descriptions(query)
+        tool_candidates_per_tool_descriptions = math.ceil(max(k / len(tool_descriptions), 1))
+        all_tool_lists = []
+        for tool_description in tool_descriptions:
+            current_tools = await self._fetch_tools_for_sub_query_from_vector_db(
+                tool_description,
+                tool_candidates_per_tool_descriptions,
+            )
+            all_tool_lists.append(current_tools)
+
+        return self._merge_tool_docs(all_tool_lists)
+
+    async def _fetch_tools_for_sub_query_from_vector_db(self, sub_query: str, k: int) -> List[Tuple[Document, float]]:
+        query_text = self._preprocess_text(sub_query)
 
         if self._settings["hybrid_mode"]:
             hybrid_fusion_type = self._settings["fusion_type"]
@@ -344,15 +463,39 @@ class BasicToolRagAlgorithm(ToolRagAlgorithm):
             hybrid_fusion_type = None
             hybrid_fusion_params = None
 
-        # if reranking is enabled, we have to retrieve more results than without reranking
-        actual_k = self._settings["reranker_pool_size"] if self.reranker is not None else self._settings["top_k"]
-        docs_and_scores = self.vector_store.similarity_search_with_score(
+        return self.vector_store.similarity_search_with_score(
             query_text,
-            k=actual_k,
+            k=k,
             ranker_type=hybrid_fusion_type,
             ranker_params=hybrid_fusion_params,
         )
-        relevant_documents = self._postprocess_results(docs_and_scores, query_text)
+
+    async def _get_tools_for_query(self, query: str) -> List[Tuple[Document, float]]:
+
+        # if reranking is enabled, we have to retrieve more results than without reranking
+        total_k = self._settings["reranker_pool_size"] if self.reranker is not None else self._settings["top_k"]
+
+        if not self._settings["enable_query_decomposition"]:
+            # there is just one sub-query
+            return await self._get_tools_for_sub_query(query, total_k)
+
+        sub_queries = self._decompose_query(query)
+        tools_per_sub_query = math.ceil(max(total_k / len(sub_queries), 1))
+        all_tool_lists = []
+        for sub_q in sub_queries:
+            current_tools = await self._get_tools_for_sub_query(sub_q, tools_per_sub_query)
+            all_tool_lists.append(current_tools)
+
+        return self._merge_tool_docs(all_tool_lists)
+
+    async def process_query(self, query_spec: QuerySpecification) -> AlgoResponse:
+        if not self.vector_store:
+            raise RuntimeError("process_query called before set_up")
+
+        print_verbose(f"Retrieving documents for query: {query_spec.query}")
+        docs_and_scores = await self._get_tools_for_query(query_spec.query)
+
+        relevant_documents = self._postprocess_results(docs_and_scores, self._preprocess_text(query_spec.query))
         relevant_tool_names = [d.metadata["name"] for d in relevant_documents]
 
         print_verbose(f"Retrieved tools for query #{query_spec.id}: {relevant_tool_names}")
@@ -369,3 +512,34 @@ class BasicToolRagAlgorithm(ToolRagAlgorithm):
 
     def tear_down(self) -> None:
         connections.disconnect(alias=MILVUS_CONNECTION_ALIAS)
+
+    @staticmethod
+    def _safe_json_parse(text: str):
+        text = (text or "").strip()
+        try:
+            return json.loads(text)
+        except JSONDecodeError:
+            m = re.search(r"(\{.*}|\[.*])", text, flags=re.S)
+            if m:
+                try:
+                    return json.loads(m.group(1))
+                except JSONDecodeError:
+                    pass
+        return None
+
+    @staticmethod
+    def _lines(text: str) -> List[str]:
+        return [ln.strip() for ln in (text or "").splitlines() if ln.strip()]
+
+    @staticmethod
+    def _dedup_keep_order(xs: List[str]) -> List[str]:
+        seen, out = set(), []
+        for x in xs:
+            if x not in seen:
+                seen.add(x)
+                out.append(x)
+        return out
+
+    @staticmethod
+    def _strip_numbering(s: str) -> str:
+        return re.sub(r"^\s*(?:[-*]|\d+[).:]?)\s*", "", s).strip().rstrip(".")
