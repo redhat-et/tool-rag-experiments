@@ -43,14 +43,15 @@ OVERRIDE_COLLECTION = True
 
 DEFAULT_SETTINGS = {
     # basic
-    "top_k": 3,
-    "embedding_model_id": "all-MiniLM-L6-v2",
+    "top_k": 10,
+    "embedding_model_id": "all-MiniLM-L6-v2",  # can also be a local path to a fine-tuned model
     "similarity_metric": "COSINE",
     "index_type": "FLAT",
-    "tau": None,
+    "indexed_tool_def_parts": ["name", "description"],
+
+    # preprocessing
     "text_preprocessing_operations": None,
     "max_document_size": None,
-    "indexed_tool_def_parts": ["name", "description"],
 
     # hybrid search
     "hybrid_mode": False,
@@ -70,6 +71,10 @@ DEFAULT_SETTINGS = {
     "min_sub_tasks": 1,
     "max_sub_tasks": 5,
     "query_rewrite_tool_suggestions_num": 3,
+
+    # post-retrieval filtering
+    "tau": None,  # 0.3,
+    "sim_threshold": None,  # 0.95,
 }
 
 if not VERBOSE:
@@ -104,7 +109,10 @@ class BasicToolRagAlgorithm(ToolRagAlgorithm):
     - embedding_model_id: the ID of the model to use for embedding calculation.
     - similarity_metric: the metric to use for embedding distance calculation - can be COSINE, L2 or IP (inner product).
     - index_type: the type of Milvus index to build - can be FLAT, HNSW, IVF_FLAT or any other supported type.
-    - tau: an optional threshold between 0 and 1 to filter the retrieved documents post-search (None to disable filtering).
+    - tau: an optional threshold between 0 and 1 specifying the maximal allowed distance to the query. All tools having
+      greater distance will be filtered. Set to None to disable this filter.
+    - sim_threshold: an optional threshold between 0 and 1 specifying the maximal allowed similarity between the retrieved
+      tools. Sets of highly similar tools will be filtered to only retain one. Set to None to disable this filter.
     - text_preprocessing_operations: a list of preprocessing operations to apply on the indexed documents and the
       query text. The following operations are supported: 'unicode_normalization', 'lowercase', 'collapse_whitespaces',
       'split_camel_snake_case'. Set this parameter to None to disable preprocessing or to 'all' to enable all operations.
@@ -133,6 +141,7 @@ class BasicToolRagAlgorithm(ToolRagAlgorithm):
     vector_store: Milvus or None
     reranker: CrossEncoderReranker or None
     query_rewriting_model: BaseChatModel or None
+    embeddings: HuggingFaceEmbeddings or None
 
     # due to the limitations of Langchain tools we cannot truly serialize them. Therefore, indexing
     # the tools themselves is not possible. Instead, we keep all tools in memory and only index their unique IDs (names)
@@ -149,6 +158,7 @@ class BasicToolRagAlgorithm(ToolRagAlgorithm):
         self.vector_store = None
         self.reranker = None
         self.query_rewriting_model = None
+        self.embeddings = None
 
     def _preprocess_text(self, text: str) -> str:
         ops = self._settings["text_preprocessing_operations"]
@@ -244,10 +254,13 @@ class BasicToolRagAlgorithm(ToolRagAlgorithm):
     def _index_tools(self, tools: List[BaseTool]) -> None:
         self.tool_name_to_base_tool = {tool.name: tool for tool in tools}
 
-        embeddings = HuggingFaceEmbeddings(model_name=self._settings["embedding_model_id"])
+        self.embeddings = HuggingFaceEmbeddings(model_name=self._settings["embedding_model_id"])
         if self._settings["similarity_metric"] == "COSINE":
             # L2-normalizing embedding vectors before cosine similarity makes the results more stable
-            embeddings = L2Wrapper(embeddings)
+            embeddings = L2Wrapper(self.embeddings)
+        else:
+            embeddings = self.embeddings
+
         milvus_uri = os.getenv("MILVUS_PATH")
 
         index_params = {
@@ -332,6 +345,36 @@ class BasicToolRagAlgorithm(ToolRagAlgorithm):
             raise ValueError(f"Unknown metric: {metric}")
         return [d for (d, s) in kept]
 
+    def _embed_docs(self, docs: List[Document]) -> np.ndarray:
+        """Encode docs -> (n, d), then L2-normalize for cosine."""
+        texts = [d.page_content for d in docs]
+        vecs = np.asarray(self.embeddings.embed_documents(texts), dtype=np.float32)
+        # L2-normalize the vectors
+        n = np.linalg.norm(vecs, axis=1, keepdims=True)
+        return vecs / np.maximum(n, 1e-12)
+
+    def _diversify_nms(self, docs: List[Document]) -> List[Document]:
+        """
+        Filters the documents by rank-preserving diversity (NMS).
+        """
+        if not docs:
+            return []
+
+        embedded = self._embed_docs(docs)  # (n,d), L2-normalized
+        kept_indices = []
+        for i in range(len(docs)):
+            v = embedded[i]
+            # if nothing kept yet, keep the first one (best by reranker)
+            if not kept_indices:
+                kept_indices.append(i)
+                continue
+            # compute similarity to all kept
+            sims = (embedded[kept_indices] @ v)  # (len(kept),)
+            if float(np.max(sims)) < self._settings["sim_threshold"]:
+                kept_indices.append(i)
+
+        return [docs[i] for i in kept_indices]
+
     def _postprocess_results(self, docs_and_scores: List[Tuple[Document, float]], query: str) -> List[Document]:
         """
         Optionally filters and/or reranks results from the vector DB search.
@@ -342,11 +385,15 @@ class BasicToolRagAlgorithm(ToolRagAlgorithm):
         else:
             docs = [d for (d, s) in docs_and_scores]
 
-        if not self._settings["cross_encoder_model_name"]:
-            # reranking is disabled - nothing else to do
-            return docs
+        if self._settings["cross_encoder_model_name"] is not None:
+            # reranking is enabled
+            docs = self.reranker.compress_documents(docs, query)
 
-        return self.reranker.compress_documents(docs, query)
+        if self._settings["sim_threshold"] is not None:
+            # NMS-based diversity filtering is enabled
+            docs = self._diversify_nms(docs)
+
+        return docs
 
     def _decompose_query(self, query: str) -> List[str]:
         """

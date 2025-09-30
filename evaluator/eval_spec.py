@@ -44,8 +44,8 @@ EXPERIMENTAL_ENVIRONMENT_SETTINGS: List[EvaluationEnvSpec] = [
 
 METRIC_COLLECTORS: List[PluginConfigSpec] = [
     ("answer_quality_metric_collector", dict(judges={
-        "task_success_no_ref": "AtlaAI/Selene-1-Mini-Llama-3.1-8B",
-        "task_success_with_ref": "AtlaAI/Selene-1-Mini-Llama-3.1-8B",
+        # "task_success_no_ref": "llama32-3b",
+        "task_success_with_ref": "llama32-3b",
     })),
     ("fac_metric_collector", {}),
     ("tool_selection_metric_collector", {}),
@@ -62,6 +62,7 @@ DATASET_SETTINGS: Dict[str, Any] = {
         "https://raw.githubusercontent.com/THUNLP-MT/StableToolBench/refs/heads/master/solvable_queries/test_instruction/G1_tool.json",
     ],
 
+    # URLs of the files to fetch the fine-tuning query dataset from.
     "fine_tuning_query_files": [
         "https://raw.githubusercontent.com/THUNLP-MT/StableToolBench/refs/heads/master/solvable_queries/test_instruction/G2_category.json",
         "https://raw.githubusercontent.com/THUNLP-MT/StableToolBench/refs/heads/master/solvable_queries/test_instruction/G2_instruction.json",
