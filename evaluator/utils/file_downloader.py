@@ -6,6 +6,8 @@ import tarfile
 import zipfile
 from typing import Tuple, List
 
+from pydantic import AnyUrl
+
 from evaluator.utils.utils import print_verbose
 
 _ARCHIVE_SUFFIXES = (
@@ -42,7 +44,7 @@ def _download(url: str, dest_path: Path) -> None:
     print(f"Dataset successfully downloaded to {dest_path}")
 
 
-def fetch_remote_path(remote_path: str, local_dir: str | Path) -> Path:
+def fetch_remote_path(remote_path: AnyUrl, local_dir: str | Path) -> Path:
     """
     Download a remote file or archive into `local_dir` if needed, and return the local path.
 
@@ -63,7 +65,7 @@ def fetch_remote_path(remote_path: str, local_dir: str | Path) -> Path:
 
     # Derive filename from the remote path (URL or path-like string).
     # We only use the last path component.
-    filename = Path(remote_path).name
+    filename = Path(remote_path.path).name
     if not filename:
         raise ValueError("Remote path must include a filename component.")
 
@@ -76,7 +78,7 @@ def fetch_remote_path(remote_path: str, local_dir: str | Path) -> Path:
             return target_file
         # Download
         try:
-            _download(remote_path, target_file)
+            _download(remote_path.path, target_file)
         except (HTTPError, URLError) as e:
             # Clean up partial
             if target_file.exists():
@@ -97,7 +99,7 @@ def fetch_remote_path(remote_path: str, local_dir: str | Path) -> Path:
     archive_path = local_dir / filename
     # Download archive
     try:
-        _download(remote_path, archive_path)
+        _download(remote_path.path, archive_path)
     except (HTTPError, URLError) as e:
         if archive_path.exists():
             try:
@@ -134,7 +136,7 @@ def fetch_remote_path(remote_path: str, local_dir: str | Path) -> Path:
     return target_dir
 
 
-def fetch_remote_paths(remote_paths: List[str], local_dir: str | Path) -> List[Path]:
+def fetch_remote_paths(remote_paths: List[AnyUrl], local_dir: str | Path) -> List[Path]:
     local_paths = []
     for remote_path in remote_paths:
         local_path = fetch_remote_path(remote_path, local_dir)

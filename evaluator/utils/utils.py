@@ -1,8 +1,7 @@
 import re
 from typing import Any
 
-from evaluator.eval_spec import VERBOSE
-
+from evaluator.config.defaults import VERBOSE
 
 _THINK_BLOCK = re.compile(r"<think\b[^>]*>.*?</think>", re.IGNORECASE | re.DOTALL)
 _UNCLOSED_THINK = re.compile(r"<think\b[^>]*>.*\Z", re.IGNORECASE | re.DOTALL)

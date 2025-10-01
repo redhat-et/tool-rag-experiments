@@ -10,7 +10,8 @@ from torch.utils.data import DataLoader, Dataset
 from sentence_transformers import SentenceTransformer, InputExample, losses
 
 from evaluator.components.data_provider import get_queries
-from evaluator.eval_spec import EvaluationEnvSpec
+from evaluator.config.defaults import DEFAULT_CONFIG
+from evaluator.config.schema import EnvironmentConfig, DatasetConfig
 
 
 # -------------------- utils --------------------
@@ -123,7 +124,8 @@ def build_examples_from_reader(parts: List[str], max_chars: int) -> List[InputEx
     """
     For each (query, tool_spec), create one positive pair.
     """
-    query_specs = get_queries(EvaluationEnvSpec(irrelevant_tools_ratio=0.0), fine_tuning_mode=True)
+    dataset_config = DatasetConfig.model_validate(DEFAULT_CONFIG["data"])
+    query_specs = get_queries(EnvironmentConfig(irrelevant_tools_ratio=0.0), dataset_config, fine_tuning_mode=True)
     examples: List[InputExample] = []
     count_pairs = 0
     for query_spec in query_specs:

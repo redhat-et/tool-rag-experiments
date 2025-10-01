@@ -1,9 +1,9 @@
 import importlib
 import pkgutil
 import traceback
-from typing import Type, Dict, Any, Sequence, List
+from typing import Type, Dict, Any, List
 
-from evaluator.eval_spec import PluginConfigSpec
+from evaluator.config.schema import MetricCollectorConfig, AlgorithmConfig, ModelConfig
 from evaluator.interfaces.metric_collector import MetricCollector
 from evaluator.interfaces.algorithm import Algorithm
 
@@ -50,18 +50,14 @@ def register_algorithm(name: str):
     return _decorator
 
 
-def create_algorithms(specs: Sequence[PluginConfigSpec]) -> List[Algorithm]:
-    """
-    specs: [("algorithm_a", {...}), ("algorithm_b", {...}), ...]
-    returns: [AlgorithmA(...), AlgorithmB(...), ...]
-    """
+def create_algorithms(specs: List[AlgorithmConfig], model_config: List[ModelConfig]) -> List[Algorithm]:
     if not _ALGO_REGISTRY:
         _import_all_algorithms(_ALGO_PACKAGE)
 
     instances: List[Algorithm] = []
-    for label, name, settings in specs:
-        cls = _resolve(name, _ALGO_REGISTRY)
-        instances.append(cls(dict(settings), label))
+    for spec in specs:
+        cls = _resolve(spec.module_name, _ALGO_REGISTRY)
+        instances.append(cls(dict(spec.settings), model_config, spec.label))
     return instances
 
 
@@ -79,16 +75,12 @@ def register_metric_collector(name: str):
     return _decorator
 
 
-def create_metric_collectors(specs: Sequence[PluginConfigSpec]) -> List[MetricCollector]:
-    """
-    specs: [("collector_a", {...}), ("collector_b", {...}), ...]
-    returns: [CollectorA(...), CollectorB(...), ...]
-    """
+def create_metric_collectors(specs: List[MetricCollectorConfig], model_config: List[ModelConfig]) -> List[MetricCollector]:
     if not _METRIC_REGISTRY:
         _import_all_algorithms(_METRIC_PACKAGE)
 
     instances: List[MetricCollector] = []
-    for _, name, settings in specs:
-        cls = _resolve(name, _METRIC_REGISTRY)
-        instances.append(cls(dict(settings)))
+    for spec in specs:
+        cls = _resolve(spec.module_name, _METRIC_REGISTRY)
+        instances.append(cls(dict(spec.settings), model_config))
     return instances
