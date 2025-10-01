@@ -23,8 +23,8 @@ from pymilvus import connections, utility
 from evaluator.components.data_provider import QuerySpecification
 from evaluator.components.llm_provider import get_llm, query_llm
 from evaluator.eval_spec import VERBOSE
-from evaluator.utils.module_extractor import register_tool_rag_algorithm
-from evaluator.interfaces.tool_rag_algorithm import ToolRagAlgorithm, AlgoResponse
+from evaluator.utils.module_extractor import register_algorithm
+from evaluator.interfaces.algorithm import Algorithm, AlgoResponse
 
 from dotenv import load_dotenv
 
@@ -100,8 +100,8 @@ class L2Wrapper:
         return x.tolist()
 
 
-@register_tool_rag_algorithm("tool_rag")
-class BasicToolRagAlgorithm(ToolRagAlgorithm):
+@register_algorithm("tool_rag")
+class ToolRagAlgorithm(Algorithm):
     """
     Optional configurable settings (to be provided in the 'settings' dictionary):
 

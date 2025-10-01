@@ -15,7 +15,7 @@ from evaluator.components.data_provider import get_queries, get_tools_from_queri
 from evaluator.utils.module_extractor import create_algorithms, create_metric_collectors
 from evaluator.eval_spec import EVALUATED_ALGORITHMS, METRIC_COLLECTORS, DATASET_SETTINGS, VERBOSE, EvaluationEnvSpec, \
     EXPERIMENTAL_ENVIRONMENT_SETTINGS
-from evaluator.interfaces.tool_rag_algorithm import ToolRagAlgorithm
+from evaluator.interfaces.algorithm import Algorithm
 from evaluator.utils.csv_logger import CSVLogger
 from evaluator.components.llm_provider import get_llm
 from dotenv import load_dotenv
@@ -32,8 +32,8 @@ if not VERBOSE:
 MAX_RETRIES = 5
 RETRY_DELAY = 30
 
-# an experiment is defined as a combination of a tool RAG algorithm and an environment specification
-ExperimentSpec = Tuple[ToolRagAlgorithm, EvaluationEnvSpec]
+# an experiment is defined as a combination of an algorithm and an environment specification
+ExperimentSpec = Tuple[Algorithm, EvaluationEnvSpec]
 
 
 async def run_all_experiments() -> None:
@@ -83,7 +83,7 @@ def _spec_to_str(spec: ExperimentSpec) -> str:
     return f"{algorithm.get_unique_id()}:{environment.model_dump()}"
 
 
-def _produce_experiment_specs(algorithms: List[ToolRagAlgorithm], env_specs: List[EvaluationEnvSpec]) -> List[ExperimentSpec]:
+def _produce_experiment_specs(algorithms: List[Algorithm], env_specs: List[EvaluationEnvSpec]) -> List[ExperimentSpec]:
     result = []
     for algo in algorithms:
         for spec in env_specs:

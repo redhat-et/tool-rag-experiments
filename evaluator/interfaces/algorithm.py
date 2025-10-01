@@ -10,7 +10,7 @@ from evaluator.components.data_provider import QuerySpecification
 AlgoResponse = Tuple[Dict[str, Any], Union[List[str], None]]
 
 
-class ToolRagAlgorithm(ABC):
+class Algorithm(ABC):
     __algo_name__: ClassVar[str | None] = None
 
     def __init__(self, settings: Dict):

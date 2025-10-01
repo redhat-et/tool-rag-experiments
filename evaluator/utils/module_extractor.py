@@ -5,9 +5,9 @@ from typing import Type, Dict, Any, Sequence, List
 
 from evaluator.eval_spec import PluginConfigSpec
 from evaluator.interfaces.metric_collector import MetricCollector
-from evaluator.interfaces.tool_rag_algorithm import ToolRagAlgorithm
+from evaluator.interfaces.algorithm import Algorithm
 
-_ALGO_REGISTRY: Dict[str, Type[ToolRagAlgorithm]] = {}
+_ALGO_REGISTRY: Dict[str, Type[Algorithm]] = {}
 _ALGO_PACKAGE = "evaluator.algorithms"
 
 _METRIC_REGISTRY: Dict[str, Type[MetricCollector]] = {}
@@ -36,21 +36,21 @@ def _import_all_algorithms(package_path: str) -> None:
             traceback.print_exc()
 
 
-# Tool RAG algorithm factory
-def register_tool_rag_algorithm(name: str):
-    """Decorator to register a ToolRagAlgorithm subclass under `name`."""
+# Algorithm factory
+def register_algorithm(name: str):
+    """Decorator to register an Algorithm subclass under `name`."""
     norm = _normalize(name)
 
-    def _decorator(cls: Type[ToolRagAlgorithm]):
-        if not issubclass(cls, ToolRagAlgorithm):
-            raise TypeError(f"{cls.__name__} must subclass ToolRagAlgorithm")
+    def _decorator(cls: Type[Algorithm]):
+        if not issubclass(cls, Algorithm):
+            raise TypeError(f"{cls.__name__} must subclass Algorithm")
         _ALGO_REGISTRY[norm] = cls
         setattr(cls, "__algo_name__", name)
         return cls
     return _decorator
 
 
-def create_algorithms(specs: Sequence[PluginConfigSpec]) -> List[ToolRagAlgorithm]:
+def create_algorithms(specs: Sequence[PluginConfigSpec]) -> List[Algorithm]:
     """
     specs: [("algorithm_a", {...}), ("algorithm_b", {...}), ...]
     returns: [AlgorithmA(...), AlgorithmB(...), ...]
@@ -58,7 +58,7 @@ def create_algorithms(specs: Sequence[PluginConfigSpec]) -> List[ToolRagAlgorith
     if not _ALGO_REGISTRY:
         _import_all_algorithms(_ALGO_PACKAGE)
 
-    instances: List[ToolRagAlgorithm] = []
+    instances: List[Algorithm] = []
     for name, settings in specs:
         cls = _resolve(name, _ALGO_REGISTRY)
         instances.append(cls(dict(settings)))
