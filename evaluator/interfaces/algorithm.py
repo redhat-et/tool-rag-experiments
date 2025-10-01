@@ -13,14 +13,17 @@ AlgoResponse = Tuple[Dict[str, Any], Union[List[str], None]]
 class Algorithm(ABC):
     __algo_name__: ClassVar[str | None] = None
 
-    def __init__(self, settings: Dict):
+    def __init__(self, settings: Dict, label: str = None):
         self._settings = settings
+        self._label = label
 
     @classmethod
     def get_name(cls) -> str:
         return cls.__algo_name__
 
     def get_unique_id(self) -> str:
+        if self._label is not None:
+            return self._label
         return f"{self.get_name()}:{self._settings}" if self._settings else self.get_name()
 
     @abstractmethod

@@ -148,8 +148,8 @@ class ToolRagAlgorithm(Algorithm):
     # which are later used to retrieve the actual tools.
     tool_name_to_base_tool: Dict[str, BaseTool] or None
 
-    def __init__(self, settings: Dict):
-        super().__init__(settings)
+    def __init__(self, settings: Dict, label: str = None):
+        super().__init__(settings, label)
         for key, value in DEFAULT_SETTINGS.items():
             self._settings.setdefault(key, value)
 

@@ -25,13 +25,13 @@ class EvaluationEnvSpec(BaseModel):
     irrelevant_tools_from_same_categories: bool
 
 
-PluginConfigSpec = Tuple[str, Dict[str, Any]]
+PluginConfigSpec = Tuple[str | None, str, Dict[str, Any]]
 
 VERBOSE = False
 
 EVALUATED_ALGORITHMS: List[PluginConfigSpec] = [
-    # ("baseline_algorithm", {}),
-    ("tool_rag", {"top_k": 3, "embedding_model_id": "all-MiniLM-L6-v2"}),
+    # ("Baseline", "baseline_algorithm", {}),
+    ("Basic Tool RAG", "tool_rag", {"top_k": 3, "embedding_model_id": "all-MiniLM-L6-v2"}),
 ]
 
 EXPERIMENTAL_ENVIRONMENT_SETTINGS: List[EvaluationEnvSpec] = [
@@ -43,14 +43,14 @@ EXPERIMENTAL_ENVIRONMENT_SETTINGS: List[EvaluationEnvSpec] = [
 ]
 
 METRIC_COLLECTORS: List[PluginConfigSpec] = [
-    ("answer_quality_metric_collector", dict(judges={
+    (None, "answer_quality_metric_collector", dict(judges={
         # "task_success_no_ref": "llama32-3b",
         "task_success_with_ref": "llama32-3b",
     })),
-    ("fac_metric_collector", {}),
-    ("tool_selection_metric_collector", {}),
-    ("tool_retrieval_metric_collector", {"ks": [1, 3, 5], "ap_rel_threshold": 1.0}),
-    ("efficiency_metric_collector", {}),
+    (None, "fac_metric_collector", {}),
+    (None, "tool_selection_metric_collector", {}),
+    (None, "tool_retrieval_metric_collector", {"ks": [1, 3, 5], "ap_rel_threshold": 1.0}),
+    (None, "efficiency_metric_collector", {}),
 ]
 
 DATASET_SETTINGS: Dict[str, Any] = {

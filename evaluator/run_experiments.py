@@ -48,16 +48,21 @@ async def run_all_experiments() -> None:
     print(f"Launching evaluation setup with the following parameters:")
     for key, value in DATASET_SETTINGS.items():
         print(f"{key}: {value}")
-    print(f"verbose: {VERBOSE}\n")
+    print(f"verbose: {VERBOSE}")
 
-    print("Loading metric collectors...")
+    print("\nLoading metric collectors...")
     metric_collectors = create_metric_collectors(METRIC_COLLECTORS)
-    print(f"The following metric collectors will be active during evaluation:\n{METRIC_COLLECTORS}\n")
+    print(f"The following metric collectors will be active during evaluation:")
+    for mc_spec in METRIC_COLLECTORS:
+        print(f"{mc_spec[1]} (config={mc_spec[2]})")
 
-    print("Loading algorithms and environment configurations...")
+    print("\nLoading algorithms and environment configurations...")
     algorithms = create_algorithms(EVALUATED_ALGORITHMS)
-    print(f"The following algorithms will be evaluated:\n{EVALUATED_ALGORITHMS}\n")
-    print(f"The following environment configurations will be evaluated:\n{EXPERIMENTAL_ENVIRONMENT_SETTINGS}\n")
+    print(f"The following algorithms will be evaluated:")
+    for algo_spec in EVALUATED_ALGORITHMS:
+        print(f"{algo_spec[0]} (algorithm type '{algo_spec[1]}'; config={algo_spec[2]})")
+
+    print(f"\nThe following environment configurations will be evaluated:\n{EXPERIMENTAL_ENVIRONMENT_SETTINGS}\n")
 
     experiment_specs = _produce_experiment_specs(algorithms, EXPERIMENTAL_ENVIRONMENT_SETTINGS)
 
@@ -70,7 +75,7 @@ async def run_all_experiments() -> None:
         for i, spec in enumerate(experiment_specs):
             algorithm, environment = spec
             print(f"{'-' * 60}\nRunning Experiment {i+1} of {len(experiment_specs)}: {_spec_to_str(spec)}...\n{'-' * 60}")
-            await _run_experiment(i+1, spec, metric_collectors, mcp_proxy_manager)
+            await _run_experiment(i+1, len(experiment_specs), spec, metric_collectors, mcp_proxy_manager)
             print(f"{'-' * 60}\nSummary of Experiment {i+1} - {_spec_to_str(spec)}\n{'-' * 60}")
             logger.log_experiment(meta_values={"Experiment ID": i+1, "Algorithm": algorithm.get_unique_id(), "Environment": environment.model_dump()})
 
@@ -80,7 +85,7 @@ async def run_all_experiments() -> None:
 
 def _spec_to_str(spec: ExperimentSpec) -> str:
     algorithm, environment = spec
-    return f"{algorithm.get_unique_id()}:{environment.model_dump()}"
+    return f"{algorithm.get_unique_id()} : {environment.model_dump()}"
 
 
 def _produce_experiment_specs(algorithms: List[Algorithm], env_specs: List[EvaluationEnvSpec]) -> List[ExperimentSpec]:
@@ -92,6 +97,7 @@ def _produce_experiment_specs(algorithms: List[Algorithm], env_specs: List[Evalu
 
 
 async def _run_experiment(exp_index: int,
+                          total_exp_num: int,
                           spec: ExperimentSpec,
                           metric_collectors: List[MetricCollector],
                           mcp_proxy_manager: MCPProxyManager,
@@ -100,7 +106,7 @@ async def _run_experiment(exp_index: int,
     algorithm, environment = spec
 
     for i, query_spec in enumerate(queries):
-        print(f"Processing query #{query_spec.id} (Experiment {exp_index}, query {i+1} of {len(queries)})...")
+        print(f"Processing query #{query_spec.id} (Experiment {exp_index} of {total_exp_num}, query {i+1} of {len(queries)})...")
 
         for mc in metric_collectors:
             mc.prepare_for_measurement(query_spec)

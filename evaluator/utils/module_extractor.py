@@ -59,9 +59,9 @@ def create_algorithms(specs: Sequence[PluginConfigSpec]) -> List[Algorithm]:
         _import_all_algorithms(_ALGO_PACKAGE)
 
     instances: List[Algorithm] = []
-    for name, settings in specs:
+    for label, name, settings in specs:
         cls = _resolve(name, _ALGO_REGISTRY)
-        instances.append(cls(dict(settings)))
+        instances.append(cls(dict(settings), label))
     return instances
 
 
@@ -88,7 +88,7 @@ def create_metric_collectors(specs: Sequence[PluginConfigSpec]) -> List[MetricCo
         _import_all_algorithms(_METRIC_PACKAGE)
 
     instances: List[MetricCollector] = []
-    for name, settings in specs:
+    for _, name, settings in specs:
         cls = _resolve(name, _METRIC_REGISTRY)
         instances.append(cls(dict(settings)))
     return instances

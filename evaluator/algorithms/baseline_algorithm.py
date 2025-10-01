@@ -12,8 +12,8 @@ from evaluator.interfaces.algorithm import Algorithm, AlgoResponse
 
 @register_algorithm("baseline_algorithm")
 class BaselineAlgorithm(Algorithm):
-    def __init__(self, settings: Dict):
-        super().__init__(settings)
+    def __init__(self, settings: Dict, label: str = None):
+        super().__init__(settings, label)
         self.model = None
         self.all_tools = None
 
