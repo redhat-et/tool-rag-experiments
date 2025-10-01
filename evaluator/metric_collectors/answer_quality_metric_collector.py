@@ -5,14 +5,12 @@ from typing import Any, Dict, List
 from langchain_core.language_models import BaseChatModel
 
 from evaluator.components.data_provider import QuerySpecification
-from evaluator.components.llm_provider import get_llm, query_llm
+from evaluator.components.llm_provider import query_llm
+from evaluator.config.schema import ModelConfig
 from evaluator.interfaces.metric_collector import MetricCollector
 from evaluator.utils.module_extractor import register_metric_collector
 from evaluator.utils.utils import extract_final_answer_from_response, strip_think, print_verbose
 
-# ===============================
-# Version & Scope Note
-# ===============================
 """
 This collector supports FOUR judge-based metrics, each with a dedicated prompt:
   - "task_success_no_ref"     : did the final answer solve the user's request? (no reference)
@@ -111,8 +109,8 @@ class AnswerQualityMetricCollector(MetricCollector):
     You should supply configs for only the metrics you would like the judge(s) to evaluate.
     """
 
-    def __init__(self, settings: Dict):
-        super().__init__(settings)
+    def __init__(self, settings: Dict, model_config: List[ModelConfig]):
+        super().__init__(settings, model_config)
 
         judge_models = self._settings["judges"]
         unknown = [m for m in judge_models.keys() if m not in SUPPORTED_METRICS]
@@ -123,7 +121,7 @@ class AnswerQualityMetricCollector(MetricCollector):
 
         self.judges: Dict[str, BaseChatModel] = {}
         for metric, model_id in judge_models.items():
-            self.judges[metric] = get_llm(model_id=model_id)
+            self.judges[metric] = self._get_llm(model_id=model_id)
 
         self._rows: List[Dict[str, Any]] = []
         self._n = 0

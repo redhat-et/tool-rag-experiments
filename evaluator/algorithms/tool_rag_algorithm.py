@@ -21,10 +21,11 @@ from langgraph.prebuilt import create_react_agent
 from pymilvus import connections, utility
 
 from evaluator.components.data_provider import QuerySpecification
-from evaluator.components.llm_provider import get_llm, query_llm
-from evaluator.eval_spec import VERBOSE
-from evaluator.utils.module_extractor import register_tool_rag_algorithm
-from evaluator.interfaces.tool_rag_algorithm import ToolRagAlgorithm, AlgoResponse
+from evaluator.components.llm_provider import query_llm
+from evaluator.config.defaults import VERBOSE
+from evaluator.config.schema import ModelConfig
+from evaluator.utils.module_extractor import register_algorithm
+from evaluator.interfaces.algorithm import Algorithm, AlgoResponse
 
 from dotenv import load_dotenv
 
@@ -40,42 +41,6 @@ MILVUS_CONNECTION_ALIAS = "tools_connection"
 COLLECTION_NAME = "tools_collection"
 OVERRIDE_COLLECTION = True
 
-
-DEFAULT_SETTINGS = {
-    # basic
-    "top_k": 10,
-    "embedding_model_id": "all-MiniLM-L6-v2",  # can also be a local path to a fine-tuned model
-    "similarity_metric": "COSINE",
-    "index_type": "FLAT",
-    "indexed_tool_def_parts": ["name", "description"],
-
-    # preprocessing
-    "text_preprocessing_operations": None,
-    "max_document_size": None,
-
-    # hybrid search
-    "hybrid_mode": False,
-    "analyzer_params": None,
-    "fusion_type": "rrf",
-    "fusion_k": 100,
-    "fusion_alpha": 0.5,
-
-    # reranking
-    "cross_encoder_model_name": None,  # "BAAI/bge-reranker-large",
-    "reranker_pool_size": 50,
-
-    # query rewriting / decomposition
-    "enable_query_decomposition": False,
-    "enable_query_rewriting": False,
-    "query_rewriting_model_id": "llama32-3b",
-    "min_sub_tasks": 1,
-    "max_sub_tasks": 5,
-    "query_rewrite_tool_suggestions_num": 3,
-
-    # post-retrieval filtering
-    "tau": None,  # 0.3,
-    "sim_threshold": None,  # 0.95,
-}
 
 if not VERBOSE:
     # Silence gRPC C-core and tracing
@@ -100,8 +65,8 @@ class L2Wrapper:
         return x.tolist()
 
 
-@register_tool_rag_algorithm("tool_rag")
-class BasicToolRagAlgorithm(ToolRagAlgorithm):
+@register_algorithm("tool_rag")
+class ToolRagAlgorithm(Algorithm):
     """
     Optional configurable settings (to be provided in the 'settings' dictionary):
 
@@ -148,10 +113,8 @@ class BasicToolRagAlgorithm(ToolRagAlgorithm):
     # which are later used to retrieve the actual tools.
     tool_name_to_base_tool: Dict[str, BaseTool] or None
 
-    def __init__(self, settings: Dict):
-        super().__init__(settings)
-        for key, value in DEFAULT_SETTINGS.items():
-            self._settings.setdefault(key, value)
+    def __init__(self, settings: Dict, model_config: List[ModelConfig], label: str = None):
+        super().__init__(settings, model_config, label)
 
         self.model = None
         self.tool_name_to_base_tool = None
@@ -320,7 +283,7 @@ class BasicToolRagAlgorithm(ToolRagAlgorithm):
             )
 
         if self._settings["enable_query_decomposition"] or self._settings["enable_query_rewriting"]:
-            self.query_rewriting_model = get_llm(self._settings["query_rewriting_model_id"])
+            self.query_rewriting_model = self._get_llm(self._settings["query_rewriting_model_id"])
 
         self._index_tools(tools)
 

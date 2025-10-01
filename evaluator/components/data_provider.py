@@ -9,7 +9,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from evaluator.eval_spec import DATASET_SETTINGS, EvaluationEnvSpec
+from evaluator.config.schema import EnvironmentConfig, DatasetConfig
 from evaluator.utils.file_downloader import fetch_remote_paths
 
 ToolSet = Dict[str, Dict[str, Any]]
@@ -127,14 +127,13 @@ def _load_tools_from_dir(root_dir: str or Path, categories: List[str], tool_num:
     return tool_dicts
 
 
-def _load_random_tools(categories: List[str] or None, tool_num: int) -> ToolSet:
+def _load_random_tools(categories: List[str] or None, tool_num: int, dataset_config: DatasetConfig) -> ToolSet:
     """
     Load tool_num random tools from the given categories.
     """
     # Download dataset files if needed
     root_dataset_path = Path(os.getenv("ROOT_DATASET_PATH"))
-    remote_dataset_paths = DATASET_SETTINGS["tool_files"]
-    local_paths = fetch_remote_paths(remote_dataset_paths, root_dataset_path)
+    local_paths = fetch_remote_paths(dataset_config.tool_file_paths, root_dataset_path)
 
     if len(local_paths) == 0:
         raise ValueError("No tool files provided")
@@ -157,7 +156,11 @@ def _load_random_tools(categories: List[str] or None, tool_num: int) -> ToolSet:
     return tool_api_list_to_tool_set(loaded_tools)
 
 
-def _parse_raw_query_tool_definitions(query: Dict[str, Any], experiment_environment: EvaluationEnvSpec) -> Tuple[ToolSet or None, ToolSet or None]:
+def _parse_raw_query_tool_definitions(
+        query: Dict[str, Any],
+        experiment_environment: EnvironmentConfig,
+        dataset_config: DatasetConfig,
+) -> Tuple[ToolSet or None, ToolSet or None]:
     """
     This method receives the query dict in the ToolBench dataset format.
     It returns the golden set of tools for this query. It is returned as a dictionary where
@@ -202,11 +205,12 @@ def _parse_raw_query_tool_definitions(query: Dict[str, Any], experiment_environm
     # if we reached this point, more tools are needed
     if experiment_environment.irrelevant_tools_from_same_categories:
         category_names = list(set([tool_api["category_name"] for tool_api in golden_tools.values()]))
-        random_toolset = _load_random_tools(category_names, required_number_of_additional_tools - len(additional_tools))
+        random_toolset = _load_random_tools(
+            category_names, required_number_of_additional_tools - len(additional_tools), dataset_config)
         additional_tools.update(random_toolset)
         return golden_tools, additional_tools
 
-    random_toolset = _load_random_tools(None, required_number_of_additional_tools)
+    random_toolset = _load_random_tools(None, required_number_of_additional_tools, dataset_config)
     return golden_tools, random_toolset
 
 
@@ -302,17 +306,18 @@ def _load_queries_from_single_file(
         query_file_path: str or Path,
         max_queries_num: int or None,
         root_dataset_path: str or Path,
-        experiment_environment: EvaluationEnvSpec,
+        experiment_environment: EnvironmentConfig,
+        dataset_config: DatasetConfig,
 ) -> List[QuerySpecification]:
     with open(query_file_path, 'r') as f:
         data = json.load(f)
 
-    if DATASET_SETTINGS["reference_model_id"] is None:
+    if dataset_config.reference_model_id is None:
         # judge-based evaluation is disabled - no need to load reference answers
         reference_answers_local_dir = None
     else:
         reference_answers_local_dir = fetch_remote_paths(
-            [DATASET_SETTINGS["reference_answers_path"]],
+            [dataset_config.reference_answers_path],
             root_dataset_path
         )[0]
 
@@ -323,11 +328,12 @@ def _load_queries_from_single_file(
         else:
             query = raw_query_spec.get("query")
             query_id = int(raw_query_spec.get("query_id"))
-            golden_tools, additional_tools = _parse_raw_query_tool_definitions(raw_query_spec, experiment_environment)
+            golden_tools, additional_tools = (
+                _parse_raw_query_tool_definitions(raw_query_spec, experiment_environment, dataset_config))
             if golden_tools is not None:
                 reference_answer = _load_reference_answer(
                     reference_answers_local_dir,
-                    DATASET_SETTINGS["reference_model_id"],
+                    dataset_config.reference_model_id,
                     query_id
                 )
                 queries.append(
@@ -347,13 +353,17 @@ def _load_queries_from_single_file(
     return queries
 
 
-def get_queries(experiment_environment: EvaluationEnvSpec, fine_tuning_mode=False) -> List[QuerySpecification]:
+def get_queries(
+        experiment_environment: EnvironmentConfig,
+        dataset_config: DatasetConfig,
+        fine_tuning_mode=False
+) -> List[QuerySpecification]:
     """Load queries from the dataset."""
     root_dataset_path = Path(os.getenv("ROOT_DATASET_PATH"))
     if not root_dataset_path:
         raise ValueError(f"⚠️ Root dataset folder not configured, using fallback queries.")
 
-    remote_query_files = DATASET_SETTINGS["fine_tuning_query_files"] if fine_tuning_mode else DATASET_SETTINGS["query_files"]
+    remote_query_files = dataset_config.fine_tuning_query_file_paths if fine_tuning_mode else dataset_config.query_file_paths
     if not remote_query_files:
         raise ValueError(f"⚠️ Query files not configured properly, using fallback queries.")
 
@@ -361,7 +371,7 @@ def get_queries(experiment_environment: EvaluationEnvSpec, fine_tuning_mode=Fals
     local_paths = fetch_remote_paths(remote_query_files, root_dataset_path)
 
     # Actually load the queries
-    queries_num = None if fine_tuning_mode else DATASET_SETTINGS["queries_num"]
+    queries_num = None if fine_tuning_mode else dataset_config.queries_num
     queries = []
     for path in local_paths:
         remaining_queries_num = None if queries_num is None else queries_num - len(queries)
@@ -370,7 +380,8 @@ def get_queries(experiment_environment: EvaluationEnvSpec, fine_tuning_mode=Fals
         new_queries = _load_queries_from_single_file(path,
                                                      remaining_queries_num,
                                                      root_dataset_path,
-                                                     experiment_environment)
+                                                     experiment_environment,
+                                                     dataset_config)
         queries.extend(new_queries)
 
     return queries

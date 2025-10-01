@@ -5,15 +5,16 @@ from langchain_core.tools import BaseTool
 from langgraph.prebuilt import create_react_agent
 
 from evaluator.components.data_provider import QuerySpecification
-from evaluator.eval_spec import VERBOSE
-from evaluator.utils.module_extractor import register_tool_rag_algorithm
-from evaluator.interfaces.tool_rag_algorithm import ToolRagAlgorithm, AlgoResponse
+from evaluator.config.defaults import VERBOSE
+from evaluator.config.schema import ModelConfig
+from evaluator.utils.module_extractor import register_algorithm
+from evaluator.interfaces.algorithm import Algorithm, AlgoResponse
 
 
-@register_tool_rag_algorithm("no_tool_rag_baseline")
-class NoToolRagAlgorithm(ToolRagAlgorithm):
-    def __init__(self, settings: Dict):
-        super().__init__(settings)
+@register_algorithm("baseline_algorithm")
+class BaselineAlgorithm(Algorithm):
+    def __init__(self, settings: Dict, model_config: List[ModelConfig], label: str = None):
+        super().__init__(settings, model_config, label)
         self.model = None
         self.all_tools = None
 

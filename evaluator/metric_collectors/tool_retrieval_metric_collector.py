@@ -2,6 +2,7 @@ from typing import Any, Dict, List, Optional, Set
 import math
 
 from evaluator.components.data_provider import QuerySpecification
+from evaluator.config.schema import ModelConfig
 from evaluator.interfaces.metric_collector import MetricCollector
 from evaluator.utils.module_extractor import register_metric_collector
 
@@ -26,8 +27,8 @@ class ToolRetrievalMetricCollector(MetricCollector):
       - MAP/AP uses binary relevance with threshold (ap_rel_threshold).
     """
 
-    def __init__(self, settings: Dict):
-        super().__init__(settings)
+    def __init__(self, settings: Dict, model_config: List[ModelConfig]):
+        super().__init__(settings, model_config)
 
         self.ks = self._settings["ks"]
         self.ap_rel_threshold = self._settings["ap_rel_threshold"]

@@ -1,13 +1,13 @@
 import importlib
 import pkgutil
 import traceback
-from typing import Type, Dict, Any, Sequence, List
+from typing import Type, Dict, Any, List
 
-from evaluator.eval_spec import PluginConfigSpec
+from evaluator.config.schema import MetricCollectorConfig, AlgorithmConfig, ModelConfig
 from evaluator.interfaces.metric_collector import MetricCollector
-from evaluator.interfaces.tool_rag_algorithm import ToolRagAlgorithm
+from evaluator.interfaces.algorithm import Algorithm
 
-_ALGO_REGISTRY: Dict[str, Type[ToolRagAlgorithm]] = {}
+_ALGO_REGISTRY: Dict[str, Type[Algorithm]] = {}
 _ALGO_PACKAGE = "evaluator.algorithms"
 
 _METRIC_REGISTRY: Dict[str, Type[MetricCollector]] = {}
@@ -36,32 +36,28 @@ def _import_all_algorithms(package_path: str) -> None:
             traceback.print_exc()
 
 
-# Tool RAG algorithm factory
-def register_tool_rag_algorithm(name: str):
-    """Decorator to register a ToolRagAlgorithm subclass under `name`."""
+# Algorithm factory
+def register_algorithm(name: str):
+    """Decorator to register an Algorithm subclass under `name`."""
     norm = _normalize(name)
 
-    def _decorator(cls: Type[ToolRagAlgorithm]):
-        if not issubclass(cls, ToolRagAlgorithm):
-            raise TypeError(f"{cls.__name__} must subclass ToolRagAlgorithm")
+    def _decorator(cls: Type[Algorithm]):
+        if not issubclass(cls, Algorithm):
+            raise TypeError(f"{cls.__name__} must subclass Algorithm")
         _ALGO_REGISTRY[norm] = cls
         setattr(cls, "__algo_name__", name)
         return cls
     return _decorator
 
 
-def create_algorithms(specs: Sequence[PluginConfigSpec]) -> List[ToolRagAlgorithm]:
-    """
-    specs: [("algorithm_a", {...}), ("algorithm_b", {...}), ...]
-    returns: [AlgorithmA(...), AlgorithmB(...), ...]
-    """
+def create_algorithms(specs: List[AlgorithmConfig], model_config: List[ModelConfig]) -> List[Algorithm]:
     if not _ALGO_REGISTRY:
         _import_all_algorithms(_ALGO_PACKAGE)
 
-    instances: List[ToolRagAlgorithm] = []
-    for name, settings in specs:
-        cls = _resolve(name, _ALGO_REGISTRY)
-        instances.append(cls(dict(settings)))
+    instances: List[Algorithm] = []
+    for spec in specs:
+        cls = _resolve(spec.module_name, _ALGO_REGISTRY)
+        instances.append(cls(dict(spec.settings), model_config, spec.label))
     return instances
 
 
@@ -79,16 +75,12 @@ def register_metric_collector(name: str):
     return _decorator
 
 
-def create_metric_collectors(specs: Sequence[PluginConfigSpec]) -> List[MetricCollector]:
-    """
-    specs: [("collector_a", {...}), ("collector_b", {...}), ...]
-    returns: [CollectorA(...), CollectorB(...), ...]
-    """
+def create_metric_collectors(specs: List[MetricCollectorConfig], model_config: List[ModelConfig]) -> List[MetricCollector]:
     if not _METRIC_REGISTRY:
         _import_all_algorithms(_METRIC_PACKAGE)
 
     instances: List[MetricCollector] = []
-    for name, settings in specs:
-        cls = _resolve(name, _METRIC_REGISTRY)
-        instances.append(cls(dict(settings)))
+    for spec in specs:
+        cls = _resolve(spec.module_name, _METRIC_REGISTRY)
+        instances.append(cls(dict(spec.settings), model_config))
     return instances

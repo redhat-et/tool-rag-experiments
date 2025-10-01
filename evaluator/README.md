@@ -97,7 +97,7 @@ python mcp_tool_server.py
 #### Terminal 2: Run Experiment
 ```bash
 cd src/evaluator
-python run_experiments.py
+python evaluator.py
 ```
 
 ## Output

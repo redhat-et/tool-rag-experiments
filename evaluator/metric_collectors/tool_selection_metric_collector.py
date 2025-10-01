@@ -1,6 +1,7 @@
 from typing import List, Dict, Any
 
 from evaluator.components.data_provider import QuerySpecification
+from evaluator.config.schema import ModelConfig
 from evaluator.interfaces.metric_collector import MetricCollector
 from evaluator.utils.module_extractor import register_metric_collector
 from evaluator.utils.utils import print_verbose
@@ -12,8 +13,8 @@ class ToolSelectionMetricCollector(MetricCollector):
     Tool Selection Metric Collector validates executed tool sequences against golden sets from the dataset.
     The comparison is order-independent - the metric collector only cares which tools were called, not the order.
     """
-    def __init__(self, settings: Dict):
-        super().__init__(settings)
+    def __init__(self, settings: Dict, model_config: List[ModelConfig]):
+        super().__init__(settings, model_config)
 
         self.total_queries = None
         self.exact_matches = None

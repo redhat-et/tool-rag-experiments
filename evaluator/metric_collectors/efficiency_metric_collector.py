@@ -2,6 +2,7 @@ import time
 from typing import Any, Dict, List
 
 from evaluator.components.data_provider import QuerySpecification
+from evaluator.config.schema import ModelConfig
 from evaluator.interfaces.metric_collector import MetricCollector
 from evaluator.utils.module_extractor import register_metric_collector
 
@@ -18,8 +19,8 @@ class EfficiencyMetricCollector(MetricCollector):
     - cost metrics
     """
 
-    def __init__(self, settings: Dict):
-        super().__init__(settings)
+    def __init__(self, settings: Dict, model_config: List[ModelConfig]):
+        super().__init__(settings, model_config)
 
         self._rows = []
         self._n_queries = None
