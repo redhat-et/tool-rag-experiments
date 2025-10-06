@@ -11,7 +11,7 @@ data:
     - "https://huggingface.co/datasets/stabletoolbench/ToolEnv2404/resolve/main/toolenv2404_filtered.tar.gz"
   reference_answers_path: "https://huggingface.co/datasets/stabletoolbench/baselines/resolve/main/data_baselines.zip"
   reference_model_id: "chatgpt_cot"
-  queries_num: 5
+  queries_num: null
 
 models:
   - id: "Qwen/Qwen3-8B"
