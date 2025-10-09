@@ -6,6 +6,7 @@ from typing import Type, Dict, Any, List
 from evaluator.config.schema import MetricCollectorConfig, AlgorithmConfig, ModelConfig
 from evaluator.interfaces.metric_collector import MetricCollector
 from evaluator.interfaces.algorithm import Algorithm
+from evaluator.utils.utils import log
 
 _ALGO_REGISTRY: Dict[str, Type[Algorithm]] = {}
 _ALGO_PACKAGE = "evaluator.algorithms"
@@ -32,7 +33,7 @@ def _import_all_algorithms(package_path: str) -> None:
             importlib.import_module(module_name)
         except Exception as e:
             # if some modules couldn't be imported, you still have to proceed
-            print(f"ERROR importing module {module_name}: {e}")
+            log(f"ERROR importing module {module_name}: {e}")
             traceback.print_exc()
 
 

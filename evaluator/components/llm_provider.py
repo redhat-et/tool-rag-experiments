@@ -5,7 +5,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
 from evaluator.config.schema import ModelConfig, ProviderId
-from evaluator.utils.utils import print_verbose
+from evaluator.utils.utils import log_verbose
 
 
 def get_llm(model_id: str, model_config: List[ModelConfig], **kwargs) -> BaseChatModel:
@@ -19,7 +19,7 @@ def get_llm(model_id: str, model_config: List[ModelConfig], **kwargs) -> BaseCha
                          "Please make sure to register your model along with its URL in the configuration file.")
     config = relevant_model_configs[0]
 
-    print_verbose(f"Connecting to {config.provider_id} server on {config.url} serving {model_id}...")
+    log_verbose(f"Connecting to {config.provider_id} server on {config.url} serving {model_id}...")
     stripped_url = str(config.url).strip('/')
     if config.provider_id == ProviderId.OLLAMA:
         from langchain_ollama import ChatOllama

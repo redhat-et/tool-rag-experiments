@@ -1,5 +1,7 @@
+import json
 import keyword
 import re
+from json import JSONDecodeError
 
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from mcp.server.fastmcp import FastMCP
@@ -13,7 +15,7 @@ from evaluator.utils.tool_logger import log_tool
 from inspect import Signature, Parameter
 from typing import Any, Annotated
 
-from evaluator.utils.utils import print_verbose, print_iterable_verbose
+from evaluator.utils.utils import log_verbose, print_iterable_verbose
 
 _TYPE_MAP = {
     "STRING": str,
@@ -54,7 +56,7 @@ class MCPProxyManager(object):
     def __init__(self, port: int):
         self.port = port
         self.server_switcher = UvicornServerSwitcher(port=port)
-        print_verbose(f"MCP server configured on port {port}")
+        log_verbose(f"MCP server configured on port {port}")
 
     @staticmethod
     def _register_mcp_proxy_tool(mcp_instance, tool_name, tool_dict, base_url):
@@ -131,9 +133,21 @@ class MCPProxyManager(object):
                 "mode": "sft"
             }
 
-            print_verbose(f"Sending payload to MirrorAPI: {payload}")
-            response = requests.post(predict_url, json=payload).json()
-            print_verbose(f"Tool execution response from MirrorAPI: {response}")
+            log_verbose(f"Sending payload to MirrorAPI: {payload}")
+            try:
+                response = requests.post(predict_url, json=payload).json()
+                log_verbose(f"Tool execution response from MirrorAPI: {response}")
+            except JSONDecodeError as ex:
+                error_message = f"The tool returned an invalid response, {ex}"
+                log_verbose(error_message)
+                return json.loads(f"{{ 'prediction': '', 'error': {error_message} }}")
+
+            # check whether a valid response was returned
+            if not isinstance(response, dict) or 'prediction' not in response or 'error' not in response or len(response) > 2:
+                error_message = f"The tool returned an invalid response"
+                log_verbose(error_message)
+                return json.loads(f"{{ 'prediction': '', 'error': {error_message} }}")
+
             return response
 
         final_tool_func = log_tool(tool_name)(tool_func)
@@ -155,7 +169,7 @@ class MCPProxyManager(object):
             registered_tool_names.append(tool_mcp_name)
 
         print_iterable_verbose(f"\nSummary: Registered {len(registered_tool_names)} tools:", registered_tool_names)
-        print_verbose(f"MirrorAPI base URL: {mirror_api_base_url}")
+        log_verbose(f"MirrorAPI base URL: {mirror_api_base_url}")
 
         app = mcp.streamable_http_app()
         self.server_switcher.switch(app)

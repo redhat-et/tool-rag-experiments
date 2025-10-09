@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any, Iterable, List, Dict, Optional
 
 from evaluator.interfaces.metric_collector import MetricCollector
+from evaluator.utils.utils import _generate_timestamped_file_name
 
 
 class CSVLogger:
@@ -10,13 +11,13 @@ class CSVLogger:
     def __init__(
         self,
         components: List[MetricCollector],
-        csv_path: Path,
+        csv_dir_path: str,
         metadata_columns: Optional[List[str]] = None,
         newline: str = "",
         encoding: str = "utf-8",
     ) -> None:
         self.components = components
-        self.csv_path = csv_path
+        self.csv_path = self._create_csv_path(csv_dir_path)
         self.metadata_columns = metadata_columns or []
         self.newline = newline
         self.encoding = encoding
@@ -24,6 +25,14 @@ class CSVLogger:
         self._header = []
         self._writer = None
         self._file_handle = None
+
+    @staticmethod
+    def _create_csv_path(csv_dir_path: str) -> Path:
+        csv_dir = Path(csv_dir_path)
+        csv_dir.mkdir(parents=True, exist_ok=True)
+
+        csv_file_name = _generate_timestamped_file_name("results_{}.csv")
+        return csv_dir / csv_file_name
 
     def open(self) -> None:
         """

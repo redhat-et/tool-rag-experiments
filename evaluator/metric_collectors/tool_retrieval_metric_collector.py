@@ -5,6 +5,7 @@ from evaluator.components.data_provider import QuerySpecification
 from evaluator.config.schema import ModelConfig
 from evaluator.interfaces.metric_collector import MetricCollector
 from evaluator.utils.module_extractor import register_metric_collector
+from evaluator.utils.utils import log
 
 
 @register_metric_collector("tool_retrieval_metric_collector")
@@ -104,7 +105,7 @@ class ToolRetrievalMetricCollector(MetricCollector):
             keys = self.get_collected_metrics_names()
             out = {key: "N/A" for key in keys}
             for key in out.keys():
-                print(f"{key}: N/A")
+                log(f"{key}: N/A")
             return out
 
         out = {}
@@ -121,7 +122,7 @@ class ToolRetrievalMetricCollector(MetricCollector):
         out["Mean MAP"] = self._avg(lambda r: r["ap"])
 
         for key, value in out.items():
-            print(f"{key}: {value:.3f}")
+            log(f"{key}: {value:.3f}")
         return out
 
     # ---- helpers ----

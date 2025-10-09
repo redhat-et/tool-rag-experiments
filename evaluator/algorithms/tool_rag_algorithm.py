@@ -29,7 +29,7 @@ from evaluator.interfaces.algorithm import Algorithm, AlgoResponse
 
 from dotenv import load_dotenv
 
-from evaluator.utils.utils import print_verbose
+from evaluator.utils.utils import log_verbose
 
 load_dotenv()
 
@@ -261,7 +261,7 @@ class ToolRagAlgorithm(Algorithm):
         else:
             embeddings = self.embeddings
 
-        milvus_uri = os.getenv("MILVUS_PATH")
+        milvus_uri = os.getenv("MILVUS_URL")
 
         index_params = {
             "index_type": self._settings["index_type"],
@@ -274,7 +274,7 @@ class ToolRagAlgorithm(Algorithm):
 
         connections.connect(alias=MILVUS_CONNECTION_ALIAS, uri=milvus_uri)
         if not OVERRIDE_COLLECTION and utility.has_collection(COLLECTION_NAME):
-            print_verbose(f"Loading Milvus server collection: {COLLECTION_NAME}")
+            log_verbose(f"Loading Milvus server collection: {COLLECTION_NAME}")
             self.vector_store = Milvus(
                 embedding_function=embeddings,
                 collection_name=COLLECTION_NAME,
@@ -283,7 +283,7 @@ class ToolRagAlgorithm(Algorithm):
                 search_params=search_params,
             )
 
-        print_verbose(f"Creating new Milvus collection on the server: {COLLECTION_NAME}")
+        log_verbose(f"Creating new Milvus collection on the server: {COLLECTION_NAME}")
         if self._settings["hybrid_mode"]:
             # index and search parameters must be extended for sparse search
             index_params = [index_params, None]
@@ -539,13 +539,13 @@ class ToolRagAlgorithm(Algorithm):
         if not self.vector_store:
             raise RuntimeError("process_query called before set_up")
 
-        print_verbose(f"Retrieving documents for query: {query_spec.query}")
+        log_verbose(f"Retrieving documents for query: {query_spec.query}")
         docs_and_scores = await self._get_tools_for_query(query_spec.query)
 
         relevant_documents = self._postprocess_results(docs_and_scores, self._preprocess_text(query_spec.query))
         relevant_tool_names = [d.metadata["name"] for d in relevant_documents]
 
-        print_verbose(f"Retrieved tools for query #{query_spec.id}: {relevant_tool_names}")
+        log_verbose(f"Retrieved tools for query #{query_spec.id}: {relevant_tool_names}")
         relevant_tools = [self.tool_name_to_base_tool[name] for name in relevant_tool_names]
 
         agent = create_react_agent(self.model, relevant_tools)

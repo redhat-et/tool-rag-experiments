@@ -8,7 +8,7 @@ from evaluator.components.data_provider import QuerySpecification
 from evaluator.config.schema import ModelConfig
 from evaluator.interfaces.metric_collector import MetricCollector
 from evaluator.utils.module_extractor import register_metric_collector
-from evaluator.utils.utils import print_verbose, extract_final_answer_from_response, strip_think
+from evaluator.utils.utils import log_verbose, extract_final_answer_from_response, strip_think, log
 
 
 @register_metric_collector("fac_metric_collector")
@@ -120,7 +120,7 @@ xxx
             # Always store only the boolean for memory efficiency
             self.query_results.append(evaluation_result["is_solved"])
 
-            print_verbose(f"📊 FAC Query Evaluated: {query[:50]}... {status_emoji}")
+            log_verbose(f"📊 FAC Query Evaluated: {query[:50]}... {status_emoji}")
             # Show detailed judge model output
             self.log_judge_output(query, final_answer, evaluation_result["evaluation"])
 
@@ -181,11 +181,11 @@ xxx
                 }
             else:
                 error_msg = f"API call failed: {response.status_code} - {response.text}"
-                print(f"❌ LLM judge model API error: {error_msg}")
-                print(f"🔍 Debug info:")
-                print(f"   URL: {self.judge_model_url}")
-                print(f"   Payload: {json.dumps(payload, indent=2)}")
-                print(f"   Response: {response.text}")
+                log(f"❌ LLM judge model API error: {error_msg}")
+                log(f"🔍 Debug info:")
+                log(f"   URL: {self.judge_model_url}")
+                log(f"   Payload: {json.dumps(payload, indent=2)}")
+                log(f"   Response: {response.text}")
                 return {
                     "evaluation": f"Answer Status: Unsolved\nReason: {error_msg}",
                     "is_solved": False
@@ -193,10 +193,10 @@ xxx
 
         except Exception as e:
             error_msg = f"Error calling LLM judge model: {e}"
-            print(f"❌ {error_msg}")
-            print(f"🔍 Debug info:")
-            print(f"   URL: {self.judge_model_url}")
-            print(f"   Error: {e}")
+            log(f"❌ {error_msg}")
+            log(f"🔍 Debug info:")
+            log(f"   URL: {self.judge_model_url}")
+            log(f"   Error: {e}")
             return {
                 "evaluation": f"Answer Status: Unsolved\nReason: {error_msg}",
                 "is_solved": False
@@ -216,26 +216,26 @@ xxx
                 return True
             else:
                 # If unclear, default to unsolved (conservative approach)
-                print(f"⚠️ Unclear evaluation result: {evaluation_text[:100]}...")
+                log(f"⚠️ Unclear evaluation result: {evaluation_text[:100]}...")
                 return False
 
         except Exception as e:
-            print(f"❌ Error parsing evaluation result: {e}")
+            log(f"❌ Error parsing evaluation result: {e}")
             return False
 
     @staticmethod
     def log_judge_output(query: str, answer: str, evaluation: str):
         """Log detailed judge model output and explanation."""
-        print_verbose(f"\n{'='*60}")
-        print_verbose(f"🔍 JUDGE MODEL EVALUATION")
-        print_verbose(f"{'='*60}")
+        log_verbose(f"\n{'=' * 60}")
+        log_verbose(f"🔍 JUDGE MODEL EVALUATION")
+        log_verbose(f"{'=' * 60}")
 
-        print_verbose(f"📝 Query: {query}")
-        print_verbose(f"💬 Agent's Answer: {answer}")
-        print_verbose(f"\n📋 Judge Model Output:")
-        print_verbose(f"{'-'*40}")
-        print_verbose(evaluation)
-        print_verbose(f"{'-'*40}")
+        log_verbose(f"📝 Query: {query}")
+        log_verbose(f"💬 Agent's Answer: {answer}")
+        log_verbose(f"\n📋 Judge Model Output:")
+        log_verbose(f"{'-' * 40}")
+        log_verbose(evaluation)
+        log_verbose(f"{'-' * 40}")
 
     def tear_down(self) -> None:
         """Clean up after all measurements."""
@@ -249,7 +249,7 @@ xxx
         solved_queries = sum(1 for is_solved in self.query_results if is_solved)
         solve_rate = solved_queries / total_queries
 
-        print(f"Average Task Success (FAC Evaluator): {solve_rate:.2f} (Solved {solved_queries}/{total_queries} queries)")
+        log(f"Average Task Success (FAC Evaluator): {solve_rate:.2f} (Solved {solved_queries}/{total_queries} queries)")
 
         results = {
             "Average Task Success (FAC Evaluator)": solve_rate
