@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 from evaluator.config.schema import EnvironmentConfig, DatasetConfig
 from evaluator.utils.file_downloader import fetch_remote_paths
+from evaluator.utils.utils import log
 
 ToolSet = Dict[str, Dict[str, Any]]
 
@@ -169,7 +170,7 @@ def _parse_raw_query_tool_definitions(
     """
     relevant_apis = query.get("relevant APIs")
     if not relevant_apis:
-        print(f"No relevant APIs provided in the query specification:\n{query}")
+        log(f"No relevant APIs provided in the query specification:\n{query}")
         return None, None
 
     # extract the golden tools definitions
@@ -184,7 +185,7 @@ def _parse_raw_query_tool_definitions(
                 tool_spec = tool_api
                 break
         else:
-            print(f"Bad query specification: the api doesn't appear in the API list:\n{query}")
+            log(f"Bad query specification: the api doesn't appear in the API list:\n{query}")
             return None, None
         mcp_tool_name = create_unique_mcp_tool_name(category_name, tool_name, api_name)
         golden_tools[mcp_tool_name] = tool_spec
@@ -324,7 +325,7 @@ def _load_queries_from_single_file(
     queries = []
     for raw_query_spec in data:
         if "query" not in raw_query_spec or "query_id" not in raw_query_spec:
-            print(f"Invalid query spec, skipping this query.")
+            log(f"Invalid query spec, skipping this query.")
         else:
             query = raw_query_spec.get("query")
             query_id = int(raw_query_spec.get("query_id"))
@@ -346,7 +347,7 @@ def _load_queries_from_single_file(
                     )
                 )
             else:
-                print(f"Couldn't extract the tool definitions, skipping this query.")
+                log(f"Couldn't extract the tool definitions, skipping this query.")
         if max_queries_num is not None and len(queries) >= max_queries_num:
             break
 

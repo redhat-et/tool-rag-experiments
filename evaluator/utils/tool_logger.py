@@ -2,7 +2,7 @@ import functools
 import os
 from typing import List
 
-from evaluator.utils.utils import print_verbose
+from evaluator.utils.utils import log_verbose, log
 
 
 class ToolLogger(object):
@@ -29,7 +29,7 @@ class ToolLogger(object):
             with open(self.log_file, "w") as f:
                 f.write("")
         except Exception as e:
-            print(f"❌ Error clearing tool_log.txt: {e}")
+            log(f"❌ Error clearing tool_log.txt: {e}")
 
 
 def log_tool(tool_name):
@@ -40,7 +40,7 @@ def log_tool(tool_name):
             # Create file if it doesn't exist
             with open(os.getenv("TOOL_LOG_PATH"), "a") as f:
                 f.write(f"[TOOL] {tool_name}\n")
-            print_verbose(f"Executing tool {tool_name}")
+            log_verbose(f"Executing tool {tool_name}")
             return func(*args, **kwargs)
         return wrapper
     return decorator

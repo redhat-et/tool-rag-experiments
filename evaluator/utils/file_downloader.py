@@ -8,7 +8,7 @@ from typing import Tuple, List
 
 from pydantic import AnyUrl
 
-from evaluator.utils.utils import print_verbose
+from evaluator.utils.utils import log_verbose
 
 _ARCHIVE_SUFFIXES = (
     ".tar.gz",
@@ -74,11 +74,11 @@ def fetch_remote_path(remote_path: AnyUrl, local_dir: str | Path) -> Path:
     if not is_archive:
         target_file = local_dir / filename
         if target_file.exists():
-            print_verbose(f"Dataset file {target_file} seems to already exist, skipping the dataset download step")
+            log_verbose(f"Dataset file {target_file} seems to already exist, skipping the dataset download step")
             return target_file
         # Download
         try:
-            _download(remote_path.path, target_file)
+            _download(str(remote_path), target_file)
         except (HTTPError, URLError) as e:
             # Clean up partial
             if target_file.exists():
@@ -93,13 +93,13 @@ def fetch_remote_path(remote_path: AnyUrl, local_dir: str | Path) -> Path:
     base_name, _ = _split_archive_basename(filename)
     target_dir = local_dir / base_name
     if target_dir.is_dir():
-        print_verbose(f"Dataset directory {target_dir} seems to already exist, skipping the dataset download step")
+        log_verbose(f"Dataset directory {target_dir} seems to already exist, skipping the dataset download step")
         return target_dir
 
     archive_path = local_dir / filename
     # Download archive
     try:
-        _download(remote_path.path, archive_path)
+        _download(str(remote_path), archive_path)
     except (HTTPError, URLError) as e:
         if archive_path.exists():
             try:

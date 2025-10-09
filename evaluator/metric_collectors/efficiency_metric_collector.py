@@ -5,6 +5,7 @@ from evaluator.components.data_provider import QuerySpecification
 from evaluator.config.schema import ModelConfig
 from evaluator.interfaces.metric_collector import MetricCollector
 from evaluator.utils.module_extractor import register_metric_collector
+from evaluator.utils.utils import log
 
 
 @register_metric_collector("efficiency_metric_collector")
@@ -58,5 +59,5 @@ class EfficiencyMetricCollector(MetricCollector):
             raise RuntimeError("No measurements registered, cannot produce results.")
 
         average_latency = self._total_latency / self._n_queries
-        print(f"Average Latency (s): {average_latency}")
+        log(f"Average Latency (s): {average_latency}")
         return {"Average Latency (s)": average_latency}

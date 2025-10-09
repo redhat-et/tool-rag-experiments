@@ -4,7 +4,7 @@ from evaluator.components.data_provider import QuerySpecification
 from evaluator.config.schema import ModelConfig
 from evaluator.interfaces.metric_collector import MetricCollector
 from evaluator.utils.module_extractor import register_metric_collector
-from evaluator.utils.utils import print_verbose
+from evaluator.utils.utils import log_verbose, log
 
 
 @register_metric_collector("tool_selection_metric_collector")
@@ -73,11 +73,11 @@ class ToolSelectionMetricCollector(MetricCollector):
         executed_tool_names = kwargs["executed_tools"]
 
         if not query_spec.golden_tools:
-            print_verbose(f"{self.get_name()}: No golden tools specified, skipping this query.")
+            log_verbose(f"{self.get_name()}: No golden tools specified, skipping this query.")
             return
         golden_tool_names = list(query_spec.golden_tools.keys())
 
-        print_verbose(f"Golden tools for the query: {golden_tool_names}\nActually executed tools: {executed_tool_names}\n")
+        log_verbose(f"Golden tools for the query: {golden_tool_names}\nActually executed tools: {executed_tool_names}\n")
         metrics = self._compute_tool_set_metrics(golden_tool_names, executed_tool_names)
 
         self.total_queries += 1
@@ -103,5 +103,5 @@ class ToolSelectionMetricCollector(MetricCollector):
         }
 
         for key, value in results.items():
-            print(f"{key}: {value:.3f}")
+            log(f"{key}: {value:.3f}")
         return results

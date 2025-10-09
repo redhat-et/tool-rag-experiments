@@ -9,7 +9,7 @@ from evaluator.components.llm_provider import query_llm
 from evaluator.config.schema import ModelConfig
 from evaluator.interfaces.metric_collector import MetricCollector
 from evaluator.utils.module_extractor import register_metric_collector
-from evaluator.utils.utils import extract_final_answer_from_response, strip_think, print_verbose
+from evaluator.utils.utils import extract_final_answer_from_response, strip_think, log_verbose, log
 
 """
 This collector supports FOUR judge-based metrics, each with a dedicated prompt:
@@ -154,7 +154,7 @@ class AnswerQualityMetricCollector(MetricCollector):
         # For each requested metric, run its own prompt+judge
         if TASK_SUCCESS_NO_REF in self.metrics:
             user_prompt = _user_task_success_no_ref(query, final_answer or "")
-            print_verbose(user_prompt)
+            log_verbose(user_prompt)
             out = self._parse_judge_score(
                 query_llm(
                     model=self.judges[TASK_SUCCESS_NO_REF],
@@ -173,7 +173,7 @@ class AnswerQualityMetricCollector(MetricCollector):
                 row["task_success_with_ref_j_rationale"] = "reference_answer missing"
             else:
                 user_prompt = _user_task_success_with_ref(query, final_answer or "", ref_answer or "")
-                print_verbose(user_prompt)
+                log_verbose(user_prompt)
                 out = self._parse_judge_score(
                     query_llm(
                         model=self.judges[TASK_SUCCESS_WITH_REF],
@@ -186,7 +186,7 @@ class AnswerQualityMetricCollector(MetricCollector):
 
         if COVERAGE in self.metrics:
             user_prompt = _user_coverage(query, final_answer or "")
-            print_verbose(user_prompt)
+            log_verbose(user_prompt)
             out = self._parse_judge_score(
                 query_llm(
                     model=self.judges[COVERAGE],
@@ -199,7 +199,7 @@ class AnswerQualityMetricCollector(MetricCollector):
 
         if CLARITY in self.metrics:
             user_prompt = _user_clarity(final_answer or "")
-            print_verbose(user_prompt)
+            log_verbose(user_prompt)
             out = self._parse_judge_score(
                 query_llm(
                     model=self.judges[CLARITY],
@@ -243,12 +243,12 @@ class AnswerQualityMetricCollector(MetricCollector):
             # out["clarity_j_support"] = len(vals("clarity_j"))
 
         for key, value in out.items():
-            print(f"{key}: {value:.2f}")
+            log(f"{key}: {value:.2f}")
         return out
 
     @staticmethod
     def _parse_judge_score(text: str) -> Dict[str, Any]:
-        print_verbose(f"JUDGE EVALUATION:\n{text}")
+        log_verbose(f"JUDGE EVALUATION:\n{text}")
 
         def clip01(x: float) -> float or None:
             if x is None:
