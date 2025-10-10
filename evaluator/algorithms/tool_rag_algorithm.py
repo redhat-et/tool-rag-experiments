@@ -549,6 +549,33 @@ class ToolRagAlgorithm(Algorithm):
         agent = create_react_agent(self._model, relevant_tools)
         return await self._invoke_agent_on_query(agent, query_spec.query), relevant_tool_names
 
+    def embed_additional_queries(self, query_specs: List[QuerySpecification]):
+        """
+        Embed all additional_queries found in the provided QuerySpecification instances.
+        Returns a dict: {query_id: {tool_name: [(queryN, embedding), ...]}}
+        """
+        if not hasattr(self, "embeddings") or self.embeddings is None:
+            raise RuntimeError("Embeddings must be initialized before calling this method.")
+        results = {}
+        for spec in query_specs:
+            if not getattr(spec, "additional_queries", None):
+                continue
+            spec_results = {}
+            add_queries = spec.additional_queries
+            # flatten if wrapped in {"additional_queries": ...}
+            if isinstance(add_queries, dict) and "additional_queries" in add_queries and len(add_queries) == 1:
+                add_queries = add_queries["additional_queries"]
+            for tool_name, queries in add_queries.items():
+                emb_list = []
+                for k, query in queries.items():
+                    if not isinstance(query, str):
+                        continue
+                    emb = self.embeddings.embed_query(query)
+                    emb_list.append((k, emb))
+                spec_results[tool_name] = emb_list
+            results[spec.id] = spec_results
+        return results
+
     def tear_down(self) -> None:
         connections.disconnect(alias=MILVUS_CONNECTION_ALIAS)
 
