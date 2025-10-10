@@ -67,6 +67,10 @@ algorithms:
     module_name: "tool_rag"
     settings:
       indexed_tool_def_parts: ["description"]
+  - label: "Index With Additional Queries"
+    module_name: "tool_rag"
+    settings:
+      indexed_tool_def_parts: ["additional_queries"]
   - label: "Index Tools By Name and Args"
     module_name: "tool_rag"
     settings:

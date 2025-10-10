@@ -84,6 +84,8 @@ class ToolRagAlgorithm(Algorithm):
     - max_document_size: the maximal size, in characters, of a single indexed document, or None to disable the size limit.
     - indexed_tool_def_parts: the parts of the MCP tool definition to be used for index construction, such as 'name',
       'description', 'args', etc.
+      You can also include 'additional_queries' (or 'examples') to append example queries for each tool if provided
+      via the 'additional_queries' setting (see defaults below).
     - hybrid_mode: True to enable hybrid (sparse + dense) search and False to only enable dense search.
     - analyzer_params: parameters for the Milvus BM25 analyzer.
     - fusion_type: the algorithm for combining the dense and the sparse scores if hybrid mode is activated. Milvus only
@@ -128,7 +130,8 @@ class ToolRagAlgorithm(Algorithm):
             "embedding_model_id": "all-MiniLM-L6-v2",
             "similarity_metric": "COSINE",
             "index_type": "FLAT",
-            "indexed_tool_def_parts": ["name", "description"],
+            "indexed_tool_def_parts": ["name", "description", "additional_queries"],
+
 
             # preprocessing
             "text_preprocessing_operations": None,
@@ -232,6 +235,14 @@ class ToolRagAlgorithm(Algorithm):
                 tags = tool.tags or []
                 if tags:
                     segments.append(f"tags: {' '.join(tags)}")
+            elif p.lower() == "additional_queries":
+                # Append example queries supplied via settings["additional_queries"][tool.name]
+                examples_map = self._settings.get("additional_queries") or {}
+                examples_list = examples_map.get(tool.name) or []
+                if examples_list:
+                    rendered = self._render_examples(examples_list)
+                    if rendered:
+                        segments.append(f"ex: {rendered}")
 
         if not segments:
             raise ValueError(f"The following tool contains none of the fields listed in indexed_tool_def_parts:\n{tool}")
@@ -249,7 +260,7 @@ class ToolRagAlgorithm(Algorithm):
             documents.append(Document(page_content=page_content, metadata={"name": tool.name}))
         return documents
 
-    def _index_tools(self, tools: List[BaseTool]) -> None:
+    def _index_tools(self, tools: List[BaseTool], queries: List[QuerySpecification]) -> None:
         self.tool_name_to_base_tool = {tool.name: tool for tool in tools}
 
         self.embeddings = HuggingFaceEmbeddings(model_name=self._settings["embedding_model_id"])
@@ -308,7 +319,7 @@ class ToolRagAlgorithm(Algorithm):
                 search_params=search_params,
             )
 
-    def set_up(self, model: BaseChatModel, tools: List[BaseTool]) -> None:
+    def set_up(self, model: BaseChatModel, tools: List[BaseTool], queries: List[QuerySpecification]) -> None:
         super().set_up(model, tools)
 
         if self._settings["cross_encoder_model_name"]:
@@ -320,7 +331,34 @@ class ToolRagAlgorithm(Algorithm):
         if self._settings["enable_query_decomposition"] or self._settings["enable_query_rewriting"]:
             self.query_rewriting_model = self._get_llm(self._settings["query_rewriting_model_id"])
 
-        self._index_tools(tools)
+        # Build additional_queries mapping from provided QuerySpecifications so YAML is not required.
+        try:
+            tool_examples: Dict[str, List[str]] = {}
+            for spec in (queries or []):
+                add_q = getattr(spec, "additional_queries", None) or {}
+                # Flatten wrapper {"additional_queries": {...}} if present
+                if isinstance(add_q, dict) and "additional_queries" in add_q and len(add_q) == 1:
+                    add_q = add_q["additional_queries"]
+                for tool_name, qmap in add_q.items():
+                    if isinstance(qmap, dict):
+                        for _, qtext in qmap.items():
+                            if isinstance(qtext, str) and qtext.strip():
+                                tool_examples.setdefault(tool_name, []).append(qtext.strip())
+            # Dedupe while preserving order
+            for k, v in list(tool_examples.items()):
+                seen = set()
+                deduped = []
+                for s in v:
+                    if s not in seen:
+                        seen.add(s)
+                        deduped.append(s)
+                tool_examples[k] = deduped
+            if tool_examples:
+                self._settings["additional_queries"] = tool_examples
+        except Exception:
+            pass
+
+        self._index_tools(tools, queries)
 
     def _threshold_results(self, docs_and_scores: List[Tuple[Document, float]]) -> List[Document]:
         """

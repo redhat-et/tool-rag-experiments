@@ -27,6 +27,8 @@ class QuerySpecification(BaseModel):
     """
     id: int
     query: str
+    additional_queries: Optional[Dict[str, Any]] = None
+    path: Optional[str] = None
     reference_answer: Optional[str] = None
     golden_tools: ToolSet = Field(default_factory=dict)
     additional_tools: Optional[ToolSet] = None
@@ -313,7 +315,7 @@ def _load_queries_from_single_file(
         root_dataset_path: str or Path,
         experiment_environment: EnvironmentConfig,
         dataset_config: DatasetConfig,
-) -> List[QuerySpecification]:
+) -> Tuple[List[QuerySpecification], List[Dict[str, Any]]]:
     with open(query_file_path, 'r') as f:
         data = json.load(f)
 
@@ -332,6 +334,13 @@ def _load_queries_from_single_file(
             log(f"Invalid query spec, skipping this query.")
         else:
             query = raw_query_spec.get("query")
+            if raw_query_spec.get("additional_queries"):
+                additional_queries = raw_query_spec.get("additional_queries")
+                print(f"Additional queries provided: {additional_queries}")
+
+            else:
+                print(f"No additional queries provided")
+                additional_queries = None
             query_id = int(raw_query_spec.get("query_id"))
             golden_tools, additional_tools = (
                 _parse_raw_query_tool_definitions(raw_query_spec, experiment_environment, dataset_config))
@@ -345,6 +354,8 @@ def _load_queries_from_single_file(
                     QuerySpecification(
                         id=query_id,
                         query=query,
+                        path=str(query_file_path),
+                        additional_queries=additional_queries,
                         reference_answer=reference_answer,
                         golden_tools=golden_tools,
                         additional_tools=additional_tools or None
@@ -362,7 +373,7 @@ def get_queries(
         experiment_environment: EnvironmentConfig,
         dataset_config: DatasetConfig,
         fine_tuning_mode=False
-) -> List[QuerySpecification]:
+) -> Tuple[List[QuerySpecification], List[Dict[str, Any]]]:
     """Load queries from the dataset."""
     root_dataset_path = Path(os.getenv("ROOT_DATASET_PATH"))
     if not root_dataset_path:
@@ -379,14 +390,14 @@ def get_queries(
     queries_num = None if fine_tuning_mode else dataset_config.queries_num
     queries = []
     for path in local_paths:
+        print(f"\n\n")
+        print(f"--------------------------------")
+        print(f"Loading queries from file: {path}")
+        print(f"\n\n")
         remaining_queries_num = None if queries_num is None else queries_num - len(queries)
         if remaining_queries_num == 0:
             break
-        new_queries = _load_queries_from_single_file(path,
-                                                     remaining_queries_num,
-                                                     root_dataset_path,
-                                                     experiment_environment,
-                                                     dataset_config)
+        new_queries= _load_queries_from_single_file(path, remaining_queries_num, root_dataset_path, experiment_environment, dataset_config)
         queries.extend(new_queries)
 
     return queries
