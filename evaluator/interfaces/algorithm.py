@@ -3,9 +3,11 @@ from typing import Dict, Any, ClassVar, List, Tuple, Union
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.tools import BaseTool
+from langgraph.graph.state import CompiledStateGraph
 
 from evaluator.components.data_provider import QuerySpecification
 from evaluator.components.llm_provider import get_llm
+from evaluator.config.defaults import VERBOSE
 from evaluator.config.schema import ModelConfig
 
 # the algorithm result consists of the query response and the list of retrieved tools, if available
@@ -22,6 +24,7 @@ class Algorithm(ABC):
             self._settings.setdefault(key, value)
 
         self._label = label
+        self._model = None
         self._model_config = model_config
 
     @classmethod
@@ -40,9 +43,18 @@ class Algorithm(ABC):
         """ A helper method for subclasses. """
         return get_llm(model_id, self._model_config, **kwargs)
 
+    @staticmethod
+    async def _invoke_agent_on_query(agent: CompiledStateGraph, query: str, **kwargs):
+        return await agent.ainvoke(
+            input={"messages": query},
+            max_iterations=6,
+            print_mode="debug" if VERBOSE else (),
+            **kwargs
+        )
+
     @abstractmethod
     def set_up(self, model: BaseChatModel, tools: List[BaseTool]) -> None:
-        raise NotImplementedError()
+        self._model = model
 
     @abstractmethod
     async def process_query(self, query_spec: QuerySpecification) -> AlgoResponse:

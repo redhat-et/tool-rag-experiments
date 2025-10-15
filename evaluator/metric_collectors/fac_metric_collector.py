@@ -247,7 +247,7 @@ xxx
         total_queries = len(self.query_results)
         # Count solved queries from our direct evaluations
         solved_queries = sum(1 for is_solved in self.query_results if is_solved)
-        solve_rate = solved_queries / total_queries
+        solve_rate = solved_queries / total_queries if total_queries > 0 else 0.0
 
         log(f"Average Task Success (FAC Evaluator): {solve_rate:.2f} (Solved {solved_queries}/{total_queries} queries)")
 

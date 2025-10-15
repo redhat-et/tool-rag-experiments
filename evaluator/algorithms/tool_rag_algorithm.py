@@ -102,7 +102,6 @@ class ToolRagAlgorithm(Algorithm):
     - query_rewrite_tool_suggestions_num: the maximal number of tool APIs to produce from the original query during rewriting.
     """
 
-    model: BaseChatModel or None
     vector_store: Milvus or None
     reranker: CrossEncoderReranker or None
     query_rewriting_model: BaseChatModel or None
@@ -116,7 +115,6 @@ class ToolRagAlgorithm(Algorithm):
     def __init__(self, settings: Dict, model_config: List[ModelConfig], label: str = None):
         super().__init__(settings, model_config, label)
 
-        self.model = None
         self.tool_name_to_base_tool = None
         self.vector_store = None
         self.reranker = None
@@ -311,7 +309,7 @@ class ToolRagAlgorithm(Algorithm):
             )
 
     def set_up(self, model: BaseChatModel, tools: List[BaseTool]) -> None:
-        self.model = model
+        super().set_up(model, tools)
 
         if self._settings["cross_encoder_model_name"]:
             self.reranker = CrossEncoderReranker(
@@ -548,14 +546,8 @@ class ToolRagAlgorithm(Algorithm):
         log_verbose(f"Retrieved tools for query #{query_spec.id}: {relevant_tool_names}")
         relevant_tools = [self.tool_name_to_base_tool[name] for name in relevant_tool_names]
 
-        agent = create_react_agent(self.model, relevant_tools)
-        print_mode = "debug" if VERBOSE else ()
-        response = await agent.ainvoke(
-            input={"messages": query_spec.query},
-            max_iterations=6,
-            print_mode=print_mode
-        )
-        return response, relevant_tool_names
+        agent = create_react_agent(self._model, relevant_tools)
+        return await self._invoke_agent_on_query(agent, query_spec.query), relevant_tool_names
 
     def tear_down(self) -> None:
         connections.disconnect(alias=MILVUS_CONNECTION_ALIAS)
