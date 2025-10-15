@@ -5,7 +5,6 @@ from langchain_core.tools import BaseTool
 from langgraph.prebuilt import create_react_agent
 
 from evaluator.components.data_provider import QuerySpecification
-from evaluator.config.defaults import VERBOSE
 from evaluator.config.schema import ModelConfig
 from evaluator.utils.module_extractor import register_algorithm
 from evaluator.interfaces.algorithm import Algorithm, AlgoResponse
@@ -15,11 +14,10 @@ from evaluator.interfaces.algorithm import Algorithm, AlgoResponse
 class BaselineAlgorithm(Algorithm):
     def __init__(self, settings: Dict, model_config: List[ModelConfig], label: str = None):
         super().__init__(settings, model_config, label)
-        self.model = None
         self.all_tools = None
 
     def set_up(self, model: BaseChatModel, tools: List[BaseTool]) -> None:
-        self.model = model
+        super().set_up(model, tools)
         self.all_tools = tools
 
     @staticmethod
@@ -42,15 +40,8 @@ class BaselineAlgorithm(Algorithm):
             raise RuntimeError("process_query called before set_up")
 
         tools = self._filter_relevant_tools(query_spec)
-        agent = create_react_agent(self.model, tools)
-        print_mode = "debug" if VERBOSE else ()
-
-        response = await agent.ainvoke(
-            input={"messages": query_spec.query},
-            max_iterations=6,
-            print_mode=print_mode
-        )
-        return response, None
+        agent = create_react_agent(self._model, tools)
+        return await self._invoke_agent_on_query(agent, query_spec.query), None
 
     def tear_down(self) -> None:
         pass

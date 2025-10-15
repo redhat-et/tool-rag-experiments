@@ -13,7 +13,8 @@ from evaluator.utils.utils import extract_final_answer_from_response, strip_thin
 
 """
 This collector supports FOUR judge-based metrics, each with a dedicated prompt:
-  - "task_success_no_ref"     : did the final answer solve the user's request? (no reference)
+  - "binary_task_success_no_ref"     : did the final answer solve the user's request? (no reference)
+  - "task_success_no_ref"     : to what extent did the final answer solve the user's request? (no reference)
   - "task_success_with_ref"   : same, but evaluated against a provided reference answer
   - "coverage"                : did the answer satisfy all constraints/requirements from the query?
   - "clarity"                 : readability/conciseness/structure (normalized 0..1 from 1..5 scale internally)
@@ -29,14 +30,16 @@ Rationales are requested from the judge for every metric.
 # ===============================
 # Metric Keys (constants)
 # ===============================
+BINARY_TASK_SUCCESS_NO_REF = "binary_task_success_no_ref"
 TASK_SUCCESS_NO_REF = "task_success_no_ref"
 TASK_SUCCESS_WITH_REF = "task_success_with_ref"
 COVERAGE = "coverage"
 CLARITY = "clarity"
 
-SUPPORTED_METRICS = {TASK_SUCCESS_NO_REF, TASK_SUCCESS_WITH_REF, COVERAGE, CLARITY}
+SUPPORTED_METRICS = {BINARY_TASK_SUCCESS_NO_REF, TASK_SUCCESS_NO_REF, TASK_SUCCESS_WITH_REF, COVERAGE, CLARITY}
 
 METRIC_NAME_TO_DESCRIPTION = {
+    BINARY_TASK_SUCCESS_NO_REF: "Average Binary Task Success (No Ref)",
     TASK_SUCCESS_NO_REF: "Average Task Success (No Ref)",
     TASK_SUCCESS_WITH_REF: "Average Task Success (With Ref)",
     COVERAGE: "Coverage of Constraints and Requirements",
@@ -47,6 +50,12 @@ METRIC_NAME_TO_DESCRIPTION = {
 # ===============================
 # Per-Metric System Prompts
 # ===============================
+_SYS_TASK_BINARY_SUCCESS_NO_REF = """\
+You are a strict evaluator. Judge whether the FINAL ANSWER successfully solves the USER QUERY. 
+Return 1 if the answer is correct or 0 if the answer is incorrect. Do not assign scores other than 1 or 0.
+Ignore style; focus on correctness and whether the requested outcome is achieved.
+Return a JSON: {"score": 0 or 1, "rationale": "<=60 words>"}.
+"""
 _SYS_TASK_SUCCESS_NO_REF = """\
 You are a strict evaluator. Judge whether the FINAL ANSWER successfully solves the USER QUERY.
 Ignore style; focus on correctness and whether the requested outcome is achieved.
@@ -152,6 +161,19 @@ class AnswerQualityMetricCollector(MetricCollector):
         row: Dict[str, Any] = {"query": query}
 
         # For each requested metric, run its own prompt+judge
+        if BINARY_TASK_SUCCESS_NO_REF in self.metrics:
+            user_prompt = _user_task_success_no_ref(query, final_answer or "")
+            log_verbose(user_prompt)
+            out = self._parse_judge_score(
+                query_llm(
+                    model=self.judges[BINARY_TASK_SUCCESS_NO_REF],
+                    system_prompt=_SYS_TASK_BINARY_SUCCESS_NO_REF,
+                    user_prompt=user_prompt,
+                )
+            )
+            row["binary_task_success_no_ref_j"] = out.get("score")
+            row["binary_task_success_no_ref_j_rationale"] = out.get("rationale")
+
         if TASK_SUCCESS_NO_REF in self.metrics:
             user_prompt = _user_task_success_no_ref(query, final_answer or "")
             log_verbose(user_prompt)
@@ -226,6 +248,10 @@ class AnswerQualityMetricCollector(MetricCollector):
 
         out = {}
 
+        if BINARY_TASK_SUCCESS_NO_REF in self.metrics:
+            out[METRIC_NAME_TO_DESCRIPTION[BINARY_TASK_SUCCESS_NO_REF]] = mean("binary_task_success_no_ref_j")
+            # out["binary_task_success_no_ref_j_support"] = len(vals("binary_task_success_no_ref_j"))
+
         if TASK_SUCCESS_NO_REF in self.metrics:
             out[METRIC_NAME_TO_DESCRIPTION[TASK_SUCCESS_NO_REF]] = mean("task_success_no_ref_j")
             # out["task_success_no_ref_j_support"] = len(vals("task_success_no_ref_j"))
@@ -243,7 +269,8 @@ class AnswerQualityMetricCollector(MetricCollector):
             # out["clarity_j_support"] = len(vals("clarity_j"))
 
         for key, value in out.items():
-            log(f"{key}: {value:.2f}")
+            if value is not None:
+                log(f"{key}: {value:.2f}")
         return out
 
     @staticmethod
