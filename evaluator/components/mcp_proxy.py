@@ -41,7 +41,7 @@ def _sanitize(name: str, used: set[str]) -> str:
     """
     base = re.sub(r'\W+', '_', name).strip('_') or "param"
     if base[0].isdigit():
-        base = "_" + base
+        base = "num_" + base
     if keyword.iskeyword(base):
         base = base + "_"
     cand, i = base, 2
@@ -77,7 +77,10 @@ class MCPProxyManager(object):
             if sanitized != original_name:
                 sanitized_to_original_name[sanitized] = original_name
 
-            py_t = _TYPE_MAP.get(entry.get("type", "").upper(), Any)
+            entry_type = entry.get("type", "")
+            if not isinstance(entry_type, str):
+                entry_type = ""
+            py_t = _TYPE_MAP.get(entry_type.upper(), Any)
             desc = (entry.get("description") or "").strip()
             default = entry.get("default", None)
 
