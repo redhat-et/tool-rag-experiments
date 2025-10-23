@@ -49,19 +49,6 @@ class EnvironmentConfig(BaseModel):
     # The ID of the model to be used for inference during the experiment.
     model_id: str
 
-    # The ratio of relevant to irrelevant tools in the prompt that uses no tool RAG.
-    # For instance:
-    # - if this value is 0.0, the prompt will only include the correct tools with no irrelevant ones
-    # - if this value is 1.0, the prompt will include one irrelevant tool for each relevant tools, i.e., the total
-    #   number of tools will be double the number of the correct tools
-    # - if this value is 0.5, the prompt will include one irrelevant tool for each two relevant tools (rounding up)
-    # Negative values are not allowed.
-    irrelevant_tools_ratio: float
-
-    # True to fetch irrelevant tools from the same categories as the relevant tools and False to include
-    # fully random tools instead. We expect irrelevant tools from the same categories to confuse the model more.
-    irrelevant_tools_from_same_categories: bool
-
 
 class AlgorithmConfig(BaseModel):
     module_name: str

@@ -190,11 +190,14 @@ def _parse_raw_query_tool_definitions(
         mcp_tool_name = create_unique_mcp_tool_name(category_name, tool_name, api_name)
         golden_tools[mcp_tool_name] = tool_spec
 
+    return golden_tools, None
+
+    # -------------- Deprecated code - soon to be removed --------------
+
     # extract the rest of the available tools, if available
     additional_tool_apis = [tool_api for tool_api in query["api_list"] if tool_api not in golden_tools.values()]
     additional_tools = tool_api_list_to_tool_set(additional_tool_apis)
 
-    # extract additional irrelevant tools if needed
     required_number_of_additional_tools = math.ceil(experiment_environment.irrelevant_tools_ratio * len(golden_tools))
     if required_number_of_additional_tools == 0:
         return golden_tools, None

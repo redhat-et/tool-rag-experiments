@@ -37,10 +37,15 @@ DEFAULT_CONFIG = {
     ],
 
     "environments": [
-        {"model_id": "granite32-8b", "irrelevant_tools_ratio": 0.0, "irrelevant_tools_from_same_categories": True},
+        {"model_id": "granite32-8b"},
     ],
 
     "algorithms": [
+        {
+            "module_name": "baseline_algorithm",
+            "label": "Baseline",
+            "settings": {"available_tools_per_query": 50},
+        },
         {
             "module_name": "tool_rag",
             "label": "Tool RAG",
@@ -65,8 +70,8 @@ DEFAULT_CONFIG = {
                     "fusion_alpha": 0.5,
 
                     # reranking
-                    "cross_encoder_model_name": None,  # "BAAI/bge-reranker-large",
-                    "reranker_pool_size": 80,
+                    "cross_encoder_model_name": "BAAI/bge-reranker-large",
+                    "reranker_pool_size": 50,
 
                     # query rewriting / decomposition
                     "enable_query_decomposition": False,
