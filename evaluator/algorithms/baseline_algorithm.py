@@ -29,6 +29,9 @@ class BaselineAlgorithm(Algorithm):
         self.all_tools = tools
 
     def _filter_relevant_tools(self, query_spec: QuerySpecification) -> List[BaseTool]:
+        if query_spec.demo_mode:
+            return self.all_tools
+
         filtered_tools = []
         for tool in self.all_tools:
             if tool.name in query_spec.golden_tools:

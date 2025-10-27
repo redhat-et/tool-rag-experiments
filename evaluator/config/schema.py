@@ -33,7 +33,7 @@ class DatasetConfig(BaseModel):
     reference_answers_path: Optional[AnyUrl] = None
 
     # the ID of the model that produced the reference answers.
-    reference_model_id: str
+    reference_model_id: Optional[str] = None
 
     # The number of queries to include in the evaluation or None to include all available queries.
     queries_num: int | None

@@ -30,6 +30,7 @@ class QuerySpecification(BaseModel):
     reference_answer: Optional[str] = None
     golden_tools: ToolSet = Field(default_factory=dict)
     additional_tools: Optional[ToolSet] = None
+    demo_mode: Optional[bool] = False
 
 
 def create_unique_mcp_tool_name(category_name: str, tool_name: str, api_name: str) -> str:
