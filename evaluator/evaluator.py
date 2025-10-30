@@ -3,7 +3,7 @@ import os
 import time
 import traceback
 from typing import List, Tuple
-
+from pathlib import Path
 import openai
 from langgraph.errors import GraphRecursionError
 from pydantic import ValidationError
@@ -17,6 +17,8 @@ from evaluator.utils.module_extractor import create_algorithms, create_metric_co
 from evaluator.interfaces.algorithm import Algorithm
 from evaluator.utils.csv_logger import CSVLogger
 from evaluator.components.llm_provider import get_llm
+from evaluator.utils.parsing_tools import generate_and_save_additional_queries
+import json as _json
 from dotenv import load_dotenv
 
 from evaluator.utils.tool_logger import ToolLogger
@@ -35,13 +37,13 @@ class Evaluator(object):
 
     config: EvaluationConfig
 
-    def __init__(self, config_path: str | None, use_defaults: bool):
+    def __init__(self, config_path: str | None, use_defaults: bool, test_with_additional_queries: bool = False):
         try:
             self.config = load_config(config_path, use_defaults=use_defaults)
         except ConfigError as ce:
             log(f"Configuration error: {ce}")
             raise SystemExit(2)
-
+        self.test_with_additional_queries = test_with_additional_queries
     async def run(self) -> None:
 
         # Set up the necessary components for the experiments:
@@ -112,7 +114,6 @@ class Evaluator(object):
         Runs the specified experiment and returns the number of evaluated queries.
         """
         processed_queries_num = 0
-
         try:
             queries = await self._set_up_experiment(spec, metric_collectors, mcp_proxy_manager)
             algorithm, environment = spec
@@ -120,7 +121,6 @@ class Evaluator(object):
             try:
                 for i, query_spec in enumerate(queries):
                     log(f"Processing query #{query_spec.id} (Experiment {exp_index} of {total_exp_num}, query {i+1} of {len(queries)})...")
-
                     for mc in metric_collectors:
                         mc.prepare_for_measurement(query_spec)
 
@@ -199,12 +199,13 @@ class Evaluator(object):
         log(f"Initializing LLM connection: {environment.model_id}")
         llm = get_llm(model_id=environment.model_id, model_config=self.config.models)
         log("Connection established successfully.\n")
-
         log("Fetching queries for the current experiment...")
         queries = get_queries(environment, self.config.data)
         log(f"Successfully loaded {len(queries)} queries.\n")
         print_iterable_verbose("The following queries will be executed:\n", queries)
-
+        log(f"Generating additional queries.\n")
+        generate_and_save_additional_queries(llm, queries)
+        queries = get_queries(environment, self.config.data)
         log("Retrieving tool definitions for the current experiment...")
         tool_specs = get_tools_from_queries(queries)
         tools = await mcp_proxy_manager.run_mcp_proxy(tool_specs, init_client=True).get_tools()
@@ -212,9 +213,34 @@ class Evaluator(object):
         log(f"The experiment will proceed with {len(tools)} tool(s).\n")
 
         log("Setting up the algorithm and the metric collectors...")
-        algorithm.set_up(llm, tools)
+        
+        algorithm.set_up(llm, tools, queries)
         for mc in metric_collectors:
             mc.set_up()
         log("All set!\n")
 
         return queries
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="Run the Evaluator experiments.")
+    parser.add_argument("--config", type=str, default=None, help="Path to evaluation config YAML file")
+    parser.add_argument("--defaults", action="store_true", help="Use default config options if set")
+    parser.add_argument("--test-with-additional-queries", action="store_true", help="Test with additional queries")
+    args = parser.parse_args()
+
+    from evaluator.utils.utils import log
+
+    log("Starting Evaluator main...")
+    evaluator = Evaluator(
+        config_path=args.config,
+        use_defaults=args.defaults,
+        test_with_additional_queries=args.test_with_additional_queries
+    )
+    try:
+        import asyncio
+        asyncio.run(evaluator.run())
+        log("Evaluator finished successfully!")
+    except Exception as e:
+        log(f"Evaluator failed: {e}")
+        raise
