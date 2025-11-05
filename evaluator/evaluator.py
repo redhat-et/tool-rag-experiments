@@ -1,5 +1,6 @@
 import asyncio
 import os
+from re import S
 import time
 import traceback
 from typing import List, Tuple
@@ -68,6 +69,18 @@ class Evaluator(object):
         # Actually run the experiments
         metadata_columns = ["Experiment ID", "Algorithm ID", "Algorithm Details", "Environment", "Number of Queries"]
         with CSVLogger(metric_collectors, os.getenv("OUTPUT_DIR_PATH"), metadata_columns=metadata_columns) as logger:
+            # generate additional queries here (optional)
+            try:
+                log(f"Generating additional queries...")
+                environment = experiment_specs[0][1]
+                gen_model_id = self.config.data.additional_queries_model_id
+                llm = get_llm(model_id=gen_model_id, model_config=self.config.models)
+                queries = get_queries(environment, self.config.data)
+                generate_and_save_additional_queries(llm, queries)
+            except Exception as _:
+                log("Skipping additional query generation due to error.")
+
+            # generate queries here
             for i, spec in enumerate(experiment_specs):
                 algorithm, environment = spec
                 log(f"{'-' * 60}\nRunning Experiment {i+1} of {len(experiment_specs)}: {self._spec_to_str(spec)}...\n{'-' * 60}")
@@ -114,6 +127,7 @@ class Evaluator(object):
         Runs the specified experiment and returns the number of evaluated queries.
         """
         processed_queries_num = 0
+
         try:
             queries = await self._set_up_experiment(spec, metric_collectors, mcp_proxy_manager)
             algorithm, environment = spec
@@ -121,6 +135,7 @@ class Evaluator(object):
             try:
                 for i, query_spec in enumerate(queries):
                     log(f"Processing query #{query_spec.id} (Experiment {exp_index} of {total_exp_num}, query {i+1} of {len(queries)})...")
+                    
                     for mc in metric_collectors:
                         mc.prepare_for_measurement(query_spec)
 
@@ -195,29 +210,28 @@ class Evaluator(object):
                                  mcp_proxy_manager: MCPProxyManager,
                                  ) -> List[QuerySpecification]:
         algorithm, environment = spec
-
         log(f"Initializing LLM connection: {environment.model_id}")
-        llm = get_llm(model_id=environment.model_id, model_config=self.config.models)
         log("Connection established successfully.\n")
         log("Fetching queries for the current experiment...")
         queries = get_queries(environment, self.config.data)
         log(f"Successfully loaded {len(queries)} queries.\n")
         print_iterable_verbose("The following queries will be executed:\n", queries)
-        log(f"Generating additional queries.\n")
-        generate_and_save_additional_queries(llm, queries)
+        llm = get_llm(model_id=environment.model_id, model_config=self.config.models)
         queries = get_queries(environment, self.config.data)
         log("Retrieving tool definitions for the current experiment...")
         tool_specs = get_tools_from_queries(queries)
         tools = await mcp_proxy_manager.run_mcp_proxy(tool_specs, init_client=True).get_tools()
         print_iterable_verbose("The following tools will be available during evaluation:\n", tools)
         log(f"The experiment will proceed with {len(tools)} tool(s).\n")
-
         log("Setting up the algorithm and the metric collectors...")
-        
-        algorithm.set_up(llm, tools, queries)
+        # Pass queries to algorithms that accept them; fall back for others
+        if algorithm.__module__ == "evaluator.algorithms.tool_rag_algorithm":
+            algorithm.set_up(llm, tools, tool_specs)
+        else:
+            algorithm.set_up(llm, tools)
         for mc in metric_collectors:
             mc.set_up()
-        log("All set!\n")
+        log("Setup complete!")
 
         return queries
 

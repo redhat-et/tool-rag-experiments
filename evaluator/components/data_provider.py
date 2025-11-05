@@ -315,7 +315,7 @@ def _load_queries_from_single_file(
         root_dataset_path: str or Path,
         experiment_environment: EnvironmentConfig,
         dataset_config: DatasetConfig,
-) -> Tuple[List[QuerySpecification], List[Dict[str, Any]]]:
+) -> List[QuerySpecification]:
     with open(query_file_path, 'r') as f:
         data = json.load(f)
 
@@ -334,13 +334,6 @@ def _load_queries_from_single_file(
             log(f"Invalid query spec, skipping this query.")
         else:
             query = raw_query_spec.get("query")
-            if raw_query_spec.get("additional_queries"):
-                additional_queries = raw_query_spec.get("additional_queries")
-                print(f"Additional queries provided: {additional_queries}")
-
-            else:
-                print(f"No additional queries provided")
-                additional_queries = None
             query_id = int(raw_query_spec.get("query_id"))
             golden_tools, additional_tools = (
                 _parse_raw_query_tool_definitions(raw_query_spec, experiment_environment, dataset_config))
@@ -354,8 +347,6 @@ def _load_queries_from_single_file(
                     QuerySpecification(
                         id=query_id,
                         query=query,
-                        path=str(query_file_path),
-                        additional_queries=additional_queries,
                         reference_answer=reference_answer,
                         golden_tools=golden_tools,
                         additional_tools=additional_tools or None
@@ -373,7 +364,7 @@ def get_queries(
         experiment_environment: EnvironmentConfig,
         dataset_config: DatasetConfig,
         fine_tuning_mode=False
-) -> Tuple[List[QuerySpecification], List[Dict[str, Any]]]:
+) -> List[QuerySpecification]:
     """Load queries from the dataset."""
     root_dataset_path = Path(os.getenv("ROOT_DATASET_PATH"))
     if not root_dataset_path:
@@ -390,14 +381,14 @@ def get_queries(
     queries_num = None if fine_tuning_mode else dataset_config.queries_num
     queries = []
     for path in local_paths:
-        print(f"\n\n")
-        print(f"--------------------------------")
-        print(f"Loading queries from file: {path}")
-        print(f"\n\n")
         remaining_queries_num = None if queries_num is None else queries_num - len(queries)
         if remaining_queries_num == 0:
             break
-        new_queries= _load_queries_from_single_file(path, remaining_queries_num, root_dataset_path, experiment_environment, dataset_config)
+        new_queries = _load_queries_from_single_file(path,
+                                                     remaining_queries_num,
+                                                     root_dataset_path,
+                                                     experiment_environment,
+                                                     dataset_config)
         queries.extend(new_queries)
 
     return queries
@@ -406,9 +397,55 @@ def get_queries(
 def get_tools_from_queries(queries: List[QuerySpecification]) -> ToolSet:
     tools = {}
 
+    # Base tools from the dataset
     for query_spec in queries:
         tools.update(query_spec.golden_tools)
         if query_spec.additional_tools:
             tools.update(query_spec.additional_tools)
 
+        # Merge per-query additional queries from centralized store under the correct tool entry
+        aq = get_additional_query(query_spec.id)
+        if isinstance(aq, dict):
+            golden_tools = query_spec.golden_tools
+            for tool in golden_tools:
+                additional_queries = aq.get(tool)
+                tools[tool]["additional_queries"] = additional_queries
+
     return tools
+
+
+def load_additional_queries_store(path: str | None = None) -> List[Dict[str, Any]]:
+    """
+    Load the centralized additional queries store.
+    Expected format: a JSON list of objects {"query_id": int, "additional_queries": {...}}.
+    Returns an empty list if the file doesn't exist or cannot be parsed.
+    """
+    try:
+        store_path = Path(path) if path else (Path("data") / "additional_queries.json")
+        if not store_path.exists():
+            return []
+        with store_path.open("r", encoding="utf-8") as f:
+            loaded = json.load(f)
+        return loaded if isinstance(loaded, list) else []
+    except Exception:
+        return []
+
+
+def get_additional_query(query_id: int) -> Dict[str, Any] | None:
+    """
+    Return the additional_queries dict for the given query_id from data/additional_queries.json,
+    or None if not found or invalid.
+    """
+    store = load_additional_queries_store()
+    for item in store:
+        if not isinstance(item, dict):
+            continue
+        if "query_id" not in item or "additional_queries" not in item:
+            continue
+        try:
+            qid = int(item["query_id"])
+        except Exception:
+            continue
+        if qid == query_id and isinstance(item["additional_queries"], dict):
+            return item["additional_queries"]
+    return None

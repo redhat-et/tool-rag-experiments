@@ -16,10 +16,10 @@ class ToolSelectionMetricCollector(MetricCollector):
     def __init__(self, settings: Dict, model_config: List[ModelConfig]):
         super().__init__(settings, model_config)
 
-        self.total_queries = 0
-        self.exact_matches = 0
-        self.precision_sum = 0.0
-        self.recall_sum = 0.0
+        self.total_queries = None
+        self.exact_matches = None
+        self.precision_sum = None
+        self.recall_sum = None
 
     def get_collected_metrics_names(self) -> List[str]:
         return ["Exact Tool Selection Match Rate",
@@ -96,10 +96,7 @@ class ToolSelectionMetricCollector(MetricCollector):
             raise RuntimeError("No measurements registered, cannot produce results.")
 
         results = {
-            "Exact Tool Selection Match Rate": (
-                (self.exact_matches or 0) / (self.total_queries or 1)
-                if self.total_queries else 0.0
-            ),
+            "Exact Tool Selection Match Rate": self.exact_matches / self.total_queries,
             "Tool Selection Precision": self.precision_sum / self.total_queries,
             "Tool Selection Recall": self.recall_sum / self.total_queries,
             "Spurious Tool Calling Rate": 1.0 - (self.precision_sum / self.total_queries),

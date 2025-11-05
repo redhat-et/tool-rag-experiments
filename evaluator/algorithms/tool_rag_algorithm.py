@@ -216,7 +216,6 @@ class ToolRagAlgorithm(Algorithm):
         parts_to_include = self._settings["indexed_tool_def_parts"]
         if not parts_to_include:
             raise ValueError("indexed_tool_def_parts must be a non-empty list")
-
         segments = []
         for p in parts_to_include:
             if p.lower() == "name":
@@ -236,18 +235,15 @@ class ToolRagAlgorithm(Algorithm):
                 if tags:
                     segments.append(f"tags: {' '.join(tags)}")
             elif p.lower() == "additional_queries":
-                # Append example queries supplied via settings["additional_queries"][tool.name]
                 examples_map = self._settings.get("additional_queries") or {}
                 examples_list = examples_map.get(tool.name) or []
                 if examples_list:
                     rendered = self._render_examples(examples_list)
                     if rendered:
                         segments.append(f"ex: {rendered}")
-
         if not segments:
             raise ValueError(f"The following tool contains none of the fields listed in indexed_tool_def_parts:\n{tool}")
         text = " | ".join(segments)
-
         # one-pass preprocess + truncation
         text = self._preprocess_text(text)
         text = self._truncate(text)
@@ -260,7 +256,31 @@ class ToolRagAlgorithm(Algorithm):
             documents.append(Document(page_content=page_content, metadata={"name": tool.name}))
         return documents
 
-    def _index_tools(self, tools: List[BaseTool], queries: List[QuerySpecification]) -> None:
+    def _collect_examples_from_tool_specs(self, tool_specs: Dict[str, Dict[str, Any]]) -> Dict[str, List[str]]:
+        """
+        Build {tool_name: [example1, example2, ...]} from a tools dict where each
+        value may contain an 'additional_queries' dict mapping query keys to strings.
+        """
+        examples: Dict[str, List[str]] = {}
+        for tool_name, spec in (tool_specs or {}).items():
+            if not isinstance(spec, dict):
+                continue
+            aq = spec.get("additional_queries")
+            if isinstance(aq, dict):
+                for _, qtext in aq.items():
+                    if isinstance(qtext, str) and qtext.strip():
+                        examples.setdefault(tool_name, []).append(qtext.strip())
+        # de-duplicate while preserving order
+        for k, v in list(examples.items()):
+            seen, out = set(), []
+            for s in v:
+                if s not in seen:
+                    seen.add(s)
+                    out.append(s)
+            examples[k] = out
+        return examples
+
+    def _index_tools(self, tools: List[BaseTool]) -> None:
         self.tool_name_to_base_tool = {tool.name: tool for tool in tools}
 
         self.embeddings = HuggingFaceEmbeddings(model_name=self._settings["embedding_model_id"])
@@ -319,7 +339,7 @@ class ToolRagAlgorithm(Algorithm):
                 search_params=search_params,
             )
 
-    def set_up(self, model: BaseChatModel, tools: List[BaseTool], queries: List[QuerySpecification]) -> None:
+    def set_up(self, model: BaseChatModel, tools: List[BaseTool], tool_specs: Any) -> None:
         super().set_up(model, tools)
 
         if self._settings["cross_encoder_model_name"]:
@@ -331,34 +351,15 @@ class ToolRagAlgorithm(Algorithm):
         if self._settings["enable_query_decomposition"] or self._settings["enable_query_rewriting"]:
             self.query_rewriting_model = self._get_llm(self._settings["query_rewriting_model_id"])
 
-        # Build additional_queries mapping from provided QuerySpecifications so YAML is not required.
+        # Build additional_queries mapping from provided specs (accept dict of tool specs or list of QuerySpecifications)
         try:
-            tool_examples: Dict[str, List[str]] = {}
-            for spec in (queries or []):
-                add_q = getattr(spec, "additional_queries", None) or {}
-                # Flatten wrapper {"additional_queries": {...}} if present
-                if isinstance(add_q, dict) and "additional_queries" in add_q and len(add_q) == 1:
-                    add_q = add_q["additional_queries"]
-                for tool_name, qmap in add_q.items():
-                    if isinstance(qmap, dict):
-                        for _, qtext in qmap.items():
-                            if isinstance(qtext, str) and qtext.strip():
-                                tool_examples.setdefault(tool_name, []).append(qtext.strip())
-            # Dedupe while preserving order
-            for k, v in list(tool_examples.items()):
-                seen = set()
-                deduped = []
-                for s in v:
-                    if s not in seen:
-                        seen.add(s)
-                        deduped.append(s)
-                tool_examples[k] = deduped
-            if tool_examples:
-                self._settings["additional_queries"] = tool_examples
+            examples_map: Dict[str, List[str]] = {}
+            if isinstance(tool_specs, dict):
+                examples_map = self._collect_examples_from_tool_specs(tool_specs)
+                self._settings["additional_queries"] = examples_map
         except Exception:
             pass
-
-        self._index_tools(tools, queries)
+        self._index_tools(tools)
 
     def _threshold_results(self, docs_and_scores: List[Tuple[Document, float]]) -> List[Document]:
         """
