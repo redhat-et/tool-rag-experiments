@@ -169,7 +169,7 @@ def demo_tools() -> List[BaseTool]:
     if not st.session_state["mcp_proxy"]:
         environment = EnvironmentConfig(model_id="granite32-8b")
         dataset_config = DatasetConfig.model_validate(DEFAULT_CONFIG["data"])
-        dataset_config.queries_num = 50
+        dataset_config.queries_num = 60
         queries = get_queries(environment, dataset_config)
         tool_specs = get_tools_from_queries(queries)
 
@@ -200,8 +200,12 @@ def sidebar() -> Tuple[str, Dict[str, Any], List[BaseTool]]:
         top_k = st.number_input("Top K", min_value=1, max_value=50, value=10)
 
         engine_settings: Dict[str, Any] = {
-            "top_k": int(top_k),
             "available_tools_per_query": None,
+
+            "top_k": int(top_k),
+            "embedding_model_id": "intfloat/e5-large-v2",
+            "max_document_size": 256,
+            "cross_encoder_model_name": "BAAI/bge-reranker-large",
         }
 
         tools: List[BaseTool] = demo_tools()
@@ -276,7 +280,7 @@ def render_tool_viewer(tools: List[BaseTool]):
         st.info("No tools loaded.")
 
 
-def render_chat():
+def render_chat(mode):
     st.subheader("💬 Chat")
 
     # Messages
@@ -332,7 +336,7 @@ def main():
                 st.metric(label="Top K", value=settings.get('top_k', '-'))
 
         st.markdown("<hr class='soft'>", unsafe_allow_html=True)
-        render_chat()
+        render_chat(mode)
 
     with tab_tools:
         render_tool_viewer(st.session_state.get("tools", []))
