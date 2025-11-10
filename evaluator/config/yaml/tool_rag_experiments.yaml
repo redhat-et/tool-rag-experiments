@@ -12,7 +12,8 @@ data:
   reference_answers_path: "https://huggingface.co/datasets/stabletoolbench/baselines/resolve/main/data_baselines.zip"
   reference_model_id: "chatgpt_cot"
   queries_num: null
-  additional_queries_model_id: "Qwen/Qwen3-8B"
+  additional_examples_model_id: "llama3.1:8b"
+  generate_examples: True
 
 models:
   - id: "Qwen/Qwen3-8B"
@@ -26,7 +27,7 @@ models:
     provider_id: "vllm"
   - id: "meta-llama/Llama-3.1-8B-Instruct"
     url: "${LLAMA_31_MODEL_URL}"
-    provider_id: "vllm"
+    provider_id: "ollama"
   - id: "AtlaAI/Selene-1-Mini-Llama-3.1-8B"
     url: "${SELENE_JUDGE_MODEL_URL}"
     provider_id: "vllm"
@@ -68,10 +69,6 @@ algorithms:
     module_name: "tool_rag"
     settings:
       indexed_tool_def_parts: ["description"]
-  - label: "Index With Additional Queries"
-    module_name: "tool_rag"
-    settings:
-      indexed_tool_def_parts: ["additional_queries"]
   - label: "Index Tools By Name and Args"
     module_name: "tool_rag"
     settings:

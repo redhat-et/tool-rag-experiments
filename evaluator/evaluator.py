@@ -1,27 +1,22 @@
 import asyncio
 import os
-from re import S
 import time
 import traceback
-from typing import List, Tuple
-from pathlib import Path
+from typing import List, Tuple, Any
 import openai
 from langgraph.errors import GraphRecursionError
 from pydantic import ValidationError
-
 from evaluator.components.mcp_proxy import MCPProxyManager
 from evaluator.config.config_io import load_config, ConfigError
 from evaluator.config.schema import EvaluationConfig, EnvironmentConfig
 from evaluator.interfaces.metric_collector import MetricCollector
-from evaluator.components.data_provider import get_queries, get_tools_from_queries, QuerySpecification
+from evaluator.components.data_provider import get_queries, get_tools_from_queries, get_examples_by_tool_name, QuerySpecification
 from evaluator.utils.module_extractor import create_algorithms, create_metric_collectors
 from evaluator.interfaces.algorithm import Algorithm
 from evaluator.utils.csv_logger import CSVLogger
 from evaluator.components.llm_provider import get_llm
-from evaluator.utils.parsing_tools import generate_and_save_additional_queries
-import json as _json
 from dotenv import load_dotenv
-
+from langchain_core.tools import BaseTool
 from evaluator.utils.tool_logger import ToolLogger
 from evaluator.utils.utils import print_iterable_verbose, log
 
@@ -38,13 +33,12 @@ class Evaluator(object):
 
     config: EvaluationConfig
 
-    def __init__(self, config_path: str | None, use_defaults: bool, test_with_additional_queries: bool = False):
+    def __init__(self, config_path: str | None, use_defaults: bool):
         try:
             self.config = load_config(config_path, use_defaults=use_defaults)
         except ConfigError as ce:
             log(f"Configuration error: {ce}")
             raise SystemExit(2)
-        self.test_with_additional_queries = test_with_additional_queries
     async def run(self) -> None:
 
         # Set up the necessary components for the experiments:
@@ -69,18 +63,7 @@ class Evaluator(object):
         # Actually run the experiments
         metadata_columns = ["Experiment ID", "Algorithm ID", "Algorithm Details", "Environment", "Number of Queries"]
         with CSVLogger(metric_collectors, os.getenv("OUTPUT_DIR_PATH"), metadata_columns=metadata_columns) as logger:
-            # generate additional queries here (optional)
-            try:
-                log(f"Generating additional queries...")
-                environment = experiment_specs[0][1]
-                gen_model_id = self.config.data.additional_queries_model_id
-                llm = get_llm(model_id=gen_model_id, model_config=self.config.models)
-                queries = get_queries(environment, self.config.data)
-                generate_and_save_additional_queries(llm, queries)
-            except Exception as _:
-                log("Skipping additional query generation due to error.")
 
-            # generate queries here
             for i, spec in enumerate(experiment_specs):
                 algorithm, environment = spec
                 log(f"{'-' * 60}\nRunning Experiment {i+1} of {len(experiment_specs)}: {self._spec_to_str(spec)}...\n{'-' * 60}")
@@ -210,51 +193,40 @@ class Evaluator(object):
                                  mcp_proxy_manager: MCPProxyManager,
                                  ) -> List[QuerySpecification]:
         algorithm, environment = spec
+
         log(f"Initializing LLM connection: {environment.model_id}")
+        llm = get_llm(model_id=environment.model_id, model_config=self.config.models)
         log("Connection established successfully.\n")
+
         log("Fetching queries for the current experiment...")
         queries = get_queries(environment, self.config.data)
         log(f"Successfully loaded {len(queries)} queries.\n")
         print_iterable_verbose("The following queries will be executed:\n", queries)
-        llm = get_llm(model_id=environment.model_id, model_config=self.config.models)
-        queries = get_queries(environment, self.config.data)
+
         log("Retrieving tool definitions for the current experiment...")
         tool_specs = get_tools_from_queries(queries)
         tools = await mcp_proxy_manager.run_mcp_proxy(tool_specs, init_client=True).get_tools()
+        tools = await self.run_and_get_tools(tools)
         print_iterable_verbose("The following tools will be available during evaluation:\n", tools)
         log(f"The experiment will proceed with {len(tools)} tool(s).\n")
+
         log("Setting up the algorithm and the metric collectors...")
-        # Pass queries to algorithms that accept them; fall back for others
-        if algorithm.__module__ == "evaluator.algorithms.tool_rag_algorithm":
-            algorithm.set_up(llm, tools, tool_specs)
-        else:
-            algorithm.set_up(llm, tools)
+        algorithm.set_up(llm, tools)
         for mc in metric_collectors:
             mc.set_up()
-        log("Setup complete!")
+        log("Setup complete!\n")
 
         return queries
+    
+    async def run_and_get_tools(self, tools: List[BaseTool]) -> List[Any]:
 
-if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser(description="Run the Evaluator experiments.")
-    parser.add_argument("--config", type=str, default=None, help="Path to evaluation config YAML file")
-    parser.add_argument("--defaults", action="store_true", help="Use default config options if set")
-    parser.add_argument("--test-with-additional-queries", action="store_true", help="Test with additional queries")
-    args = parser.parse_args()
-
-    from evaluator.utils.utils import log
-
-    log("Starting Evaluator main...")
-    evaluator = Evaluator(
-        config_path=args.config,
-        use_defaults=args.defaults,
-        test_with_additional_queries=args.test_with_additional_queries
-    )
-    try:
-        import asyncio
-        asyncio.run(evaluator.run())
-        log("Evaluator finished successfully!")
-    except Exception as e:
-        log(f"Evaluator failed: {e}")
-        raise
+        try:
+            for t in tools or []:
+                t.metadata = {}
+                name = getattr(t, "name", "")
+                aq = get_examples_by_tool_name(name)
+                if isinstance(aq, dict):
+                    t.metadata["examples"] = aq
+        except Exception:
+            pass
+        return tools

@@ -38,6 +38,12 @@ class DatasetConfig(BaseModel):
     # The number of queries to include in the evaluation or None to include all available queries.
     queries_num: int | None
 
+    # Optional model ID used specifically for generating additional tool queries
+    additional_examples_model_id: Optional[str] = None
+
+    # Whether to generate additional queries for tools that are missing them
+    generate_examples: bool = False
+
 
 class ModelConfig(BaseModel):
     id: str

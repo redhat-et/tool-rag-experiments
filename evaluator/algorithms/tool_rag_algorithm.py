@@ -84,8 +84,8 @@ class ToolRagAlgorithm(Algorithm):
     - max_document_size: the maximal size, in characters, of a single indexed document, or None to disable the size limit.
     - indexed_tool_def_parts: the parts of the MCP tool definition to be used for index construction, such as 'name',
       'description', 'args', etc.
-      You can also include 'additional_queries' (or 'examples') to append example queries for each tool if provided
-      via the 'additional_queries' setting (see defaults below).
+      You can also include 'examples' (or 'examples') to append example queries for each tool if provided
+      via the 'examples' setting (see defaults below).
     - hybrid_mode: True to enable hybrid (sparse + dense) search and False to only enable dense search.
     - analyzer_params: parameters for the Milvus BM25 analyzer.
     - fusion_type: the algorithm for combining the dense and the sparse scores if hybrid mode is activated. Milvus only
@@ -130,7 +130,7 @@ class ToolRagAlgorithm(Algorithm):
             "embedding_model_id": "all-MiniLM-L6-v2",
             "similarity_metric": "COSINE",
             "index_type": "FLAT",
-            "indexed_tool_def_parts": ["name", "description", "additional_queries"],
+            "indexed_tool_def_parts": ["name", "description"],
 
 
             # preprocessing
@@ -208,7 +208,7 @@ class ToolRagAlgorithm(Algorithm):
         return " ".join(parts)
 
     @staticmethod
-    def _render_examples(examples: List[str], max_examples: int = 3) -> str:
+    def _render_examples(examples: List[str], max_examples: int = 5) -> str:
         exs = (examples or [])[:max_examples]
         return " || ".join(exs)
 
@@ -234,9 +234,8 @@ class ToolRagAlgorithm(Algorithm):
                 tags = tool.tags or []
                 if tags:
                     segments.append(f"tags: {' '.join(tags)}")
-            elif p.lower() == "additional_queries":
-                examples_map = self._settings.get("additional_queries") or {}
-                examples_list = examples_map.get(tool.name) or []
+            elif p.lower() == "examples":
+                examples_list =list(tool.metadata['examples'].values())
                 if examples_list:
                     rendered = self._render_examples(examples_list)
                     if rendered:
@@ -255,30 +254,6 @@ class ToolRagAlgorithm(Algorithm):
             page_content = self._compose_tool_text(tool)
             documents.append(Document(page_content=page_content, metadata={"name": tool.name}))
         return documents
-
-    def _collect_examples_from_tool_specs(self, tool_specs: Dict[str, Dict[str, Any]]) -> Dict[str, List[str]]:
-        """
-        Build {tool_name: [example1, example2, ...]} from a tools dict where each
-        value may contain an 'additional_queries' dict mapping query keys to strings.
-        """
-        examples: Dict[str, List[str]] = {}
-        for tool_name, spec in (tool_specs or {}).items():
-            if not isinstance(spec, dict):
-                continue
-            aq = spec.get("additional_queries")
-            if isinstance(aq, dict):
-                for _, qtext in aq.items():
-                    if isinstance(qtext, str) and qtext.strip():
-                        examples.setdefault(tool_name, []).append(qtext.strip())
-        # de-duplicate while preserving order
-        for k, v in list(examples.items()):
-            seen, out = set(), []
-            for s in v:
-                if s not in seen:
-                    seen.add(s)
-                    out.append(s)
-            examples[k] = out
-        return examples
 
     def _index_tools(self, tools: List[BaseTool]) -> None:
         self.tool_name_to_base_tool = {tool.name: tool for tool in tools}
@@ -339,7 +314,7 @@ class ToolRagAlgorithm(Algorithm):
                 search_params=search_params,
             )
 
-    def set_up(self, model: BaseChatModel, tools: List[BaseTool], tool_specs: Any) -> None:
+    def set_up(self, model: BaseChatModel, tools: List[BaseTool]) -> None:
         super().set_up(model, tools)
 
         if self._settings["cross_encoder_model_name"]:
@@ -351,14 +326,6 @@ class ToolRagAlgorithm(Algorithm):
         if self._settings["enable_query_decomposition"] or self._settings["enable_query_rewriting"]:
             self.query_rewriting_model = self._get_llm(self._settings["query_rewriting_model_id"])
 
-        # Build additional_queries mapping from provided specs (accept dict of tool specs or list of QuerySpecifications)
-        try:
-            examples_map: Dict[str, List[str]] = {}
-            if isinstance(tool_specs, dict):
-                examples_map = self._collect_examples_from_tool_specs(tool_specs)
-                self._settings["additional_queries"] = examples_map
-        except Exception:
-            pass
         self._index_tools(tools)
 
     def _threshold_results(self, docs_and_scores: List[Tuple[Document, float]]) -> List[Document]:
