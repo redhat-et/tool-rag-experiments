@@ -47,7 +47,6 @@ class Algorithm(ABC):
     async def _invoke_agent_on_query(agent: CompiledStateGraph, query: str, **kwargs):
         return await agent.ainvoke(
             input={"messages": query},
-            max_iterations=6,
             print_mode="debug" if VERBOSE else (),
             **kwargs
         )
