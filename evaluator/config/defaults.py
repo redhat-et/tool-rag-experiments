@@ -26,7 +26,7 @@ DEFAULT_CONFIG = {
         "reference_answers_path": "https://huggingface.co/datasets/stabletoolbench/baselines/resolve/main/data_baselines.zip",
         "reference_model_id": "chatgpt_cot",
         "queries_num": None,
-        "additional_examples_model_id": "llama3.1:8b",
+        "additional_examples_model_id": "Qwen/Qwen3-8B",
         "generate_examples": True,
     },
 

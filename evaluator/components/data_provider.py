@@ -31,7 +31,6 @@ class QuerySpecification(BaseModel):
     id: int
     query: str
     examples: Optional[Dict[str, Any]] = None
-    path: Optional[str] = None
     reference_answer: Optional[str] = None
     golden_tools: ToolSet = Field(default_factory=dict)
     additional_tools: Optional[ToolSet] = None
@@ -400,7 +399,7 @@ def get_queries(
 def get_tools_from_queries(queries: List[QuerySpecification]) -> ToolSet:
     tools = {}
 
-    cfg_path = os.getenv("EVALUATOR_CONFIG_PATH")
+    cfg_path = "evaluator/config/yaml/tool_rag_experiments.yaml"
     cfg = load_config(cfg_path, use_defaults=True)
     examples = cfg.data.generate_examples
 
@@ -433,7 +432,7 @@ def load_examples_store(path: str | None = None) -> List[Dict[str, Any]]:
     Returns an empty list if the file doesn't exist or cannot be parsed.
     """
     try:
-        store_path = Path(path) if path else (Path("data") / "examples.json")
+        store_path = Path(path) if path else Path(os.getenv("EXAMPLES_STORE_PATH"))
         if not store_path.exists():
             return []
         with store_path.open("r", encoding="utf-8") as f:
@@ -509,7 +508,7 @@ def generate_and_save_examples(llm, tool_name, query_spec, store_path: Path | No
     - original user query: the initial task description
     '''     
     
-    out_path = store_path or (Path("data") / "examples.json")
+    out_path = store_path or Path(os.getenv("EXAMPLES_STORE_PATH"))
     out_path.parent.mkdir(parents=True, exist_ok=True)
     if not out_path.exists():
         try:
@@ -639,7 +638,7 @@ def is_tool_in_additional_store(tool_name: str, query_id: int, store_path: Path 
     """
 
     try:
-        out_path = store_path or (Path("data") / "examples.json")
+        out_path = store_path or Path(os.getenv("EXAMPLES_STORE_PATH"))
         if not out_path.exists():
             log(f"examples.json not found, creating empty file")
             out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -665,7 +664,7 @@ def append_examples_entry(query_id: int, examples: Dict[str, Any], store_path: P
     Append a new entry to data/examples.json in the list-of-dicts format:
       { "query_id": <int>, "examples": <dict> }
     """
-    out_path = store_path or (Path("data") / "examples.json")
+    out_path = store_path or Path(os.getenv("EXAMPLES_STORE_PATH"))
     store_list: List[Dict[str, Any]] = []
     try:
         if out_path.exists():
