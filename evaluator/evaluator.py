@@ -204,9 +204,11 @@ class Evaluator(object):
         print_iterable_verbose("The following queries will be executed:\n", queries)
 
         log("Retrieving tool definitions for the current experiment...")
-        tool_specs = get_tools_from_queries(queries)
+        model_config = self.config.models
+        model_id = self.config.data.additional_examples_model_id
+        tool_specs = get_tools_from_queries(queries,self.config.data.generate_examples,model_id,model_config)
         tools = await mcp_proxy_manager.run_mcp_proxy(tool_specs, init_client=True).get_tools()
-        tools = await self.run_and_get_tools(tools)
+        tools = await self.augment_tools_with_examples(tools)
         print_iterable_verbose("The following tools will be available during evaluation:\n", tools)
         log(f"The experiment will proceed with {len(tools)} tool(s).\n")
 
@@ -218,7 +220,7 @@ class Evaluator(object):
 
         return queries
     
-    async def run_and_get_tools(self, tools: List[BaseTool]) -> List[Any]:
+    def augment_tools_with_examples(self, tools: List[BaseTool]) -> List[Any]:
 
         try:
             for t in tools or []:
@@ -227,6 +229,6 @@ class Evaluator(object):
                 aq = get_examples_by_tool_name(name)
                 if isinstance(aq, dict):
                     t.metadata["examples"] = aq
-        except Exception:
-            pass
+        except Exception as e:
+            log(f"Error augmenting tools with examples: {e}")
         return tools

@@ -6,14 +6,11 @@ import random
 from json import JSONDecodeError
 from typing import List, Dict, Any, Optional, Tuple
 from pathlib import Path
-
-from numpy import str_
 from pydantic import BaseModel, Field
 from evaluator.components.llm_provider import query_llm, get_llm
-from evaluator.config.schema import EnvironmentConfig, DatasetConfig
+from evaluator.config.schema import EnvironmentConfig, DatasetConfig, ModelConfig
 from evaluator.utils.file_downloader import fetch_remote_paths
 from evaluator.utils.utils import log
-from evaluator.config.config_io import load_config
 from tqdm import tqdm
 import re
 ToolSet = Dict[str, Dict[str, Any]]
@@ -396,14 +393,9 @@ def get_queries(
     return queries
 
 
-def get_tools_from_queries(queries: List[QuerySpecification]) -> ToolSet:
+def get_tools_from_queries(queries: List[QuerySpecification], generate_examples: bool = False, model_id: str = None, model_config: List[ModelConfig] = None) -> ToolSet:
     tools = {}
 
-    cfg_path = "evaluator/config/yaml/tool_rag_experiments.yaml"
-    cfg = load_config(cfg_path, use_defaults=True)
-    examples = cfg.data.generate_examples
-
-    model_id = cfg.data.additional_examples_model_id
     # Base tools from the dataset
     for query_spec in tqdm(queries, desc="Getting tools from queries"):
         tools.update(query_spec.golden_tools)
@@ -411,16 +403,15 @@ def get_tools_from_queries(queries: List[QuerySpecification]) -> ToolSet:
             tools.update(query_spec.additional_tools)
 
         #Getting or generating additional examples for tools that don't have them
-        if examples:
+        if generate_examples:
             golden_tools = query_spec.golden_tools
             for tool in golden_tools:
                 examples_exists = is_tool_in_additional_store(tool, query_spec.id)
                 if not examples_exists:
-                    # TODO: get the model id from the config file, This doesnt work
-                    llm = get_llm(model_id=model_id, model_config=cfg.models)
+                    llm = get_llm(model_id=model_id, model_config=model_config)
                     tools[tool]["examples"] = generate_and_save_examples(llm, tool, query_spec)
                 else:
-                    aq = get_additional_query(query_spec.id)
+                    aq = get_example_query(query_spec.id)
                     tools[tool]["examples"] = aq[tool]
     return tools
 
@@ -442,7 +433,7 @@ def load_examples_store(path: str | None = None) -> List[Dict[str, Any]]:
         return []
 
 
-def get_additional_query(query_id: int) -> Dict[str, Any] | None:
+def get_example_query(query_id: int) -> Dict[str, Any] | None:
     """
     Return ALL examples for the given query_id by merging entries
     from data/examples.json (supports multiple records per query_id).
@@ -518,7 +509,7 @@ def generate_and_save_examples(llm, tool_name, query_spec, store_path: Path | No
             log(f"error creating central_out_path: {e}")
             pass
 
-    example = _generate_additional_query_for_tool(
+    example = _generate_example_for_tool(
             llm,
             system_prompt,
             query_spec.query,
@@ -534,7 +525,7 @@ def generate_and_save_examples(llm, tool_name, query_spec, store_path: Path | No
         append_examples_entry(query_spec.id, query_spec.examples, out_path)
     return examples
 
-def _generate_additional_query_for_tool(llm, system_prompt: str, query_text: str, tool_name: str) -> Dict[str, Any] | None:
+def _generate_example_for_tool(llm, system_prompt: str, query_text: str, tool_name: str) -> Dict[str, Any] | None:
     """
     Call the LLM to generate additional queries for a single tool, retrying until
     a mapping with query1..query5 is produced or max attempts are reached.
@@ -542,21 +533,21 @@ def _generate_additional_query_for_tool(llm, system_prompt: str, query_text: str
     """
     correct_response = False
     iteration = 0
-    additional_query = None
+    example = None
     while correct_response is False:
         user_prompt = f"tool_name = {tool_name}, Query= {query_text}"
         result = query_llm(llm, system_prompt, user_prompt)
         model_id = str(getattr(llm, "model", "") or getattr(llm, "model_name", "") or "")
         if "llama3.1:8b" in model_id:
-            additional_query = lama_model_parsing(result)
+            example = lama_model_parsing(result)
         else:
-            additional_query = qwen_model_parsing(result)
-        correct_response = has_required_query_keys(additional_query)
+            example = qwen_model_parsing(result)
+        correct_response = has_required_query_keys(example)
         iteration += 1
         if iteration > 10:
             log(f"Failed to generate additional queries for tool {tool_name} after 5 iterations")
             break
-    return additional_query
+    return example
 
 def lama_model_parsing(response: str):
     """

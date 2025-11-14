@@ -13,7 +13,7 @@ data:
   reference_model_id: "chatgpt_cot"
   queries_num: null
   additional_examples_model_id: "Qwen/Qwen3-8B"
-  generate_examples: True
+  generate_examples: False
 
 models:
   - id: "Qwen/Qwen3-8B"
@@ -25,7 +25,7 @@ models:
   - id: "llama32-3b"
     url: "${LLAMA_32_MODEL_URL}"
     provider_id: "vllm"
-  - id: "meta-llama/Llama-3.1-8B-Instruct"
+  - id: "llama-3.1-8B"
     url: "${LLAMA_31_MODEL_URL}"
     provider_id: "ollama"
   - id: "AtlaAI/Selene-1-Mini-Llama-3.1-8B"
@@ -127,7 +127,7 @@ metric_collectors:
     settings:
       judges:
         # task_success_no_ref: "llama32-3b"
-        task_success_with_ref: "llama32-3b"
+        task_success_with_ref: "Qwen/Qwen3-8B"
   - module_name: "fac_metric_collector"
     settings: {}
   - module_name: "tool_selection_metric_collector"

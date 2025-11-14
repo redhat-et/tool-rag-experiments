@@ -27,7 +27,7 @@ DEFAULT_CONFIG = {
         "reference_model_id": "chatgpt_cot",
         "queries_num": None,
         "additional_examples_model_id": "Qwen/Qwen3-8B",
-        "generate_examples": True,
+        "generate_examples": False,
     },
 
     "models": [
