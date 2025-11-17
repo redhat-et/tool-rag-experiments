@@ -84,6 +84,8 @@ class ToolRagAlgorithm(Algorithm):
     - max_document_size: the maximal size, in characters, of a single indexed document, or None to disable the size limit.
     - indexed_tool_def_parts: the parts of the MCP tool definition to be used for index construction, such as 'name',
       'description', 'args', etc.
+      You can also include 'examples' (or 'examples') to append example queries for each tool if provided
+      via the 'examples' setting (see defaults below).
     - hybrid_mode: True to enable hybrid (sparse + dense) search and False to only enable dense search.
     - analyzer_params: parameters for the Milvus BM25 analyzer.
     - fusion_type: the algorithm for combining the dense and the sparse scores if hybrid mode is activated. Milvus only
@@ -129,6 +131,7 @@ class ToolRagAlgorithm(Algorithm):
             "similarity_metric": "COSINE",
             "index_type": "FLAT",
             "indexed_tool_def_parts": ["name", "description"],
+
 
             # preprocessing
             "text_preprocessing_operations": None,
@@ -205,7 +208,7 @@ class ToolRagAlgorithm(Algorithm):
         return " ".join(parts)
 
     @staticmethod
-    def _render_examples(examples: List[str], max_examples: int = 3) -> str:
+    def _render_examples(examples: List[str], max_examples: int = 5) -> str:
         exs = (examples or [])[:max_examples]
         return " || ".join(exs)
 
@@ -213,7 +216,6 @@ class ToolRagAlgorithm(Algorithm):
         parts_to_include = self._settings["indexed_tool_def_parts"]
         if not parts_to_include:
             raise ValueError("indexed_tool_def_parts must be a non-empty list")
-
         segments = []
         for p in parts_to_include:
             if p.lower() == "name":
@@ -232,11 +234,15 @@ class ToolRagAlgorithm(Algorithm):
                 tags = tool.tags or []
                 if tags:
                     segments.append(f"tags: {' '.join(tags)}")
-
+            elif p.lower() == "examples":
+                examples_list =list(tool.metadata['examples'].values())
+                if examples_list:
+                    rendered = self._render_examples(examples_list)
+                    if rendered:
+                        segments.append(f"ex: {rendered}")
         if not segments:
             raise ValueError(f"The following tool contains none of the fields listed in indexed_tool_def_parts:\n{tool}")
         text = " | ".join(segments)
-
         # one-pass preprocess + truncation
         text = self._preprocess_text(text)
         text = self._truncate(text)
