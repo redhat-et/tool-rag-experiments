@@ -1,0 +1,191 @@
+data:
+  query_file_paths:
+    - "https://raw.githubusercontent.com/THUNLP-MT/StableToolBench/refs/heads/master/solvable_queries/test_instruction/G1_category.json"
+    - "https://raw.githubusercontent.com/THUNLP-MT/StableToolBench/refs/heads/master/solvable_queries/test_instruction/G1_instruction.json"
+    - "https://raw.githubusercontent.com/THUNLP-MT/StableToolBench/refs/heads/master/solvable_queries/test_instruction/G1_tool.json"
+  fine_tuning_query_file_paths:
+    - "https://raw.githubusercontent.com/THUNLP-MT/StableToolBench/refs/heads/master/solvable_queries/test_instruction/G2_category.json"
+    - "https://raw.githubusercontent.com/THUNLP-MT/StableToolBench/refs/heads/master/solvable_queries/test_instruction/G2_instruction.json"
+    - "https://raw.githubusercontent.com/THUNLP-MT/StableToolBench/refs/heads/master/solvable_queries/test_instruction/G3_instruction.json"
+  tool_file_paths:
+    - "https://huggingface.co/datasets/stabletoolbench/ToolEnv2404/resolve/main/toolenv2404_filtered.tar.gz"
+  reference_answers_path: "https://huggingface.co/datasets/stabletoolbench/baselines/resolve/main/data_baselines.zip"
+  reference_model_id: "chatgpt_cot"
+  queries_num: null
+
+models:
+  - id: "Qwen/Qwen3-8B"
+    url: "${QWEN_MODEL_URL}"
+    provider_id: "vllm"
+
+environments:
+  - model_id: "Qwen/Qwen3-8B"
+    irrelevant_tools_ratio: 0.0
+    irrelevant_tools_from_same_categories: true
+
+algorithms:
+  # =============================================================================
+  # BASELINE EXPERIMENTS
+  # =============================================================================
+
+  - label: "Baseline"
+    module_name: "baseline_algorithm"
+    settings:
+      available_tools_per_query: null
+    # Traditional agent with all tools available upfront (no dynamic retrieval).
+    # Establishes the performance ceiling for comparison.
+
+  - label: "TF-Baseline + TF-K10"
+    module_name: "tool_fetcher"
+    settings: {}
+    # Tool Fetcher with default settings.
+    # Hypothesis: Establishes baseline retrieval quality for the tool hub pattern.
+
+  # =============================================================================
+  # RETRIEVAL STRATEGY EXPERIMENTS
+  # =============================================================================
+
+  - label: "TF-Hybrid"
+    module_name: "tool_fetcher"
+    settings:
+      hybrid_mode: true
+    # Hybrid search: Dense embeddings + BM25 sparse retrieval with RRF fusion.
+    # Hypothesis: Semantic and lexical matching capture both conceptual similarity
+    # and keyword overlap, improving recall.
+
+  - label: "TF-Reranker"
+    module_name: "tool_fetcher"
+    settings:
+      cross_encoder_model_name: "BAAI/bge-reranker-large"
+    # Two-stage retrieval: bi-encoder (fast) → cross-encoder reranker (accurate).
+    # Hypothesis: Cross-encoder's full query-tool attention improves top-k precision,
+    # especially for nuanced semantic distinctions.
+
+  - label: "TF-All"
+    module_name: "tool_fetcher"
+    settings:
+      indexed_tool_def_parts: ["name", "description", "args"]
+      hybrid_mode: true
+      cross_encoder_model_name: "BAAI/bge-reranker-large"
+    # Combines all advanced retrieval techniques (hybrid + reranker + args).
+    # Hypothesis: Layered improvements compound to achieve optimal retrieval
+    # quality metrics (Recall@k, MAP, NDCG).
+
+  # =============================================================================
+  # RETRIEVAL SIZE (K) EXPERIMENTS
+  # =============================================================================
+
+  - label: "TF-K15"
+    module_name: "tool_fetcher"
+    settings:
+      default_search_k: 15
+    # Retrieve top-15 tools per search.
+    # Hypothesis: Mid-range k improves recall for moderately complex queries
+    # without overwhelming the agent.
+
+  - label: "TF-K20"
+    module_name: "tool_fetcher"
+    settings:
+      default_search_k: 20
+    # Retrieve top-20 tools per search.
+    # Hypothesis: Higher k maximizes recall for complex multi-step queries.
+
+  # =============================================================================
+  # EMBEDDING MODEL EXPERIMENTS
+  # =============================================================================
+
+  - label: "TF-E5"
+    module_name: "tool_fetcher"
+    settings:
+      embedding_model_id: "intfloat/e5-large-v2"
+    # E5-large-v2: Large instruction-tuned embedding model.
+    # Hypothesis: Larger model capacity enhances semantic understanding of
+    # complex and technical tool descriptions.
+
+  - label: "TF-BGE"
+    module_name: "tool_fetcher"
+    settings:
+      embedding_model_id: "BAAI/bge-large-en-v1.5"
+    # BGE-large-en-v1.5: Large embedding model trained on diverse corpus.
+    # Hypothesis: BGE's training on tool-like data (code, APIs) improves
+    # retrieval for programmatic descriptions vs. general-domain E5.
+
+  # =============================================================================
+  # INDEXED CONTENT EXPERIMENTS
+  # =============================================================================
+
+  - label: "TF-NameOnly"
+    module_name: "tool_fetcher"
+    settings:
+      indexed_tool_def_parts: ["name"]
+    # Index only tool names (e.g., "get_weather", "calculate_mortgage").
+    # Hypothesis: Minimal indexing reduces noise when tool names are
+    # self-descriptive and queries reference them explicitly.
+
+  - label: "TF-DescOnly"
+    module_name: "tool_fetcher"
+    settings:
+      indexed_tool_def_parts: ["description"]
+    # Index only tool descriptions (natural language capability statements).
+    # Hypothesis: Maximizes semantic matching for high-level intents while
+    # ignoring potentially noisy naming conventions.
+
+  - label: "TF-WithArgs"
+    module_name: "tool_fetcher"
+    settings:
+      indexed_tool_def_parts: ["name", "description", "args"]
+    # Index name + description + argument schemas.
+    # Hypothesis: Parameter names and types help match queries specifying
+    # input requirements (e.g., "takes a zip code, returns forecast").
+
+  - label: "TF-NameArgs"
+    module_name: "tool_fetcher"
+    settings:
+      indexed_tool_def_parts: ["name", "args"]
+    # Index tool name + argument schemas (no description).
+    # Hypothesis: Arg-based matching compensates for missing descriptions
+    # in structured or programmatic contexts.
+
+  - label: "TF-DescArgs"
+    module_name: "tool_fetcher"
+    settings:
+      indexed_tool_def_parts: ["description", "args"]
+    # Index description + args (omit name).
+    # Hypothesis: Combines semantic intent with structural signals while
+    # avoiding bias from potentially misleading or generic names.
+
+  # =============================================================================
+  # SIMILARITY METRIC EXPERIMENTS
+  # =============================================================================
+
+  - label: "TF-L2"
+    module_name: "tool_fetcher"
+    settings:
+      similarity_metric: "L2"
+    # L2 (Euclidean) distance metric.
+    # Hypothesis: L2 preserves magnitude information in embedding space,
+    # useful when vector norms carry semantic meaning.
+
+  - label: "TF-IP"
+    module_name: "tool_fetcher"
+    settings:
+      similarity_metric: "IP"
+    # Inner Product (IP) similarity metric.
+    # Hypothesis: Unnormalized IP amplifies high-magnitude (confident) embeddings
+    # while downweighting low-magnitude ones.
+
+metric_collectors:
+  - module_name: "answer_quality_metric_collector"
+    settings:
+      judges:
+        task_success_with_ref: "Qwen/Qwen3-8B"
+  - module_name: "tool_selection_metric_collector"
+    settings: {}
+  - module_name: "tool_retrieval_metric_collector"
+    settings:
+      ks: [1, 3, 5]
+      ap_rel_threshold: 1.0
+  - module_name: "efficiency_metric_collector"
+    settings: {}
+
+

@@ -40,7 +40,8 @@ environments:
 algorithms:
   - label: "Baseline"
     module_name: "baseline_algorithm"
-    settings: {}
+    settings:
+      available_tools_per_query: null
   - label: "Baseline Tool RAG"
     module_name: "tool_rag"
     settings:
