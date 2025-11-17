@@ -2,23 +2,21 @@ import asyncio
 import os
 import time
 import traceback
-from typing import List, Tuple
-
+from typing import List, Tuple, Any
 import openai
 from langgraph.errors import GraphRecursionError
 from pydantic import ValidationError
-
 from evaluator.components.mcp_proxy import MCPProxyManager
 from evaluator.config.config_io import load_config, ConfigError
 from evaluator.config.schema import EvaluationConfig, EnvironmentConfig
 from evaluator.interfaces.metric_collector import MetricCollector
-from evaluator.components.data_provider import get_queries, get_tools_from_queries, QuerySpecification
+from evaluator.components.data_provider import get_queries, get_tools_from_queries, get_examples_by_tool_name, QuerySpecification
 from evaluator.utils.module_extractor import create_algorithms, create_metric_collectors
 from evaluator.interfaces.algorithm import Algorithm
 from evaluator.utils.csv_logger import CSVLogger
 from evaluator.components.llm_provider import get_llm
 from dotenv import load_dotenv
-
+from langchain_core.tools import BaseTool
 from evaluator.utils.tool_logger import ToolLogger
 from evaluator.utils.utils import print_iterable_verbose, log
 
@@ -41,7 +39,6 @@ class Evaluator(object):
         except ConfigError as ce:
             log(f"Configuration error: {ce}")
             raise SystemExit(2)
-
     async def run(self) -> None:
 
         # Set up the necessary components for the experiments:
@@ -66,6 +63,7 @@ class Evaluator(object):
         # Actually run the experiments
         metadata_columns = ["Experiment ID", "Algorithm ID", "Algorithm Details", "Environment", "Number of Queries"]
         with CSVLogger(metric_collectors, os.getenv("OUTPUT_DIR_PATH"), metadata_columns=metadata_columns) as logger:
+
             for i, spec in enumerate(experiment_specs):
                 algorithm, environment = spec
                 log(f"{'-' * 60}\nRunning Experiment {i+1} of {len(experiment_specs)}: {self._spec_to_str(spec)}...\n{'-' * 60}")
@@ -120,7 +118,7 @@ class Evaluator(object):
             try:
                 for i, query_spec in enumerate(queries):
                     log(f"Processing query #{query_spec.id} (Experiment {exp_index} of {total_exp_num}, query {i+1} of {len(queries)})...")
-
+                    
                     for mc in metric_collectors:
                         mc.prepare_for_measurement(query_spec)
 
@@ -206,8 +204,11 @@ class Evaluator(object):
         print_iterable_verbose("The following queries will be executed:\n", queries)
 
         log("Retrieving tool definitions for the current experiment...")
-        tool_specs = get_tools_from_queries(queries)
+        model_config = self.config.models
+        model_id = self.config.data.additional_examples_model_id
+        tool_specs = get_tools_from_queries(queries,self.config.data.generate_examples,model_id,model_config)
         tools = await mcp_proxy_manager.run_mcp_proxy(tool_specs, init_client=True).get_tools()
+        tools = await self.augment_tools_with_examples(tools)
         print_iterable_verbose("The following tools will be available during evaluation:\n", tools)
         log(f"The experiment will proceed with {len(tools)} tool(s).\n")
 
@@ -215,6 +216,19 @@ class Evaluator(object):
         algorithm.set_up(llm, tools)
         for mc in metric_collectors:
             mc.set_up()
-        log("All set!\n")
+        log("Setup complete!\n")
 
         return queries
+    
+    def augment_tools_with_examples(self, tools: List[BaseTool]) -> List[Any]:
+
+        try:
+            for t in tools or []:
+                t.metadata = {}
+                name = getattr(t, "name", "")
+                aq = get_examples_by_tool_name(name)
+                if isinstance(aq, dict):
+                    t.metadata["examples"] = aq
+        except Exception as e:
+            log(f"Error augmenting tools with examples: {e}")
+        return tools

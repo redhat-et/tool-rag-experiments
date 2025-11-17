@@ -47,6 +47,8 @@ class ToolRagAlgorithm(BaseRetrievalAlgorithm):
     - max_document_size: the maximal size, in characters, of a single indexed document, or None to disable the size limit.
     - indexed_tool_def_parts: the parts of the MCP tool definition to be used for index construction, such as 'name',
       'description', 'args', etc.
+      You can also include 'examples' (or 'examples') to append example queries for each tool if provided
+      via the 'examples' setting (see defaults below).
     - hybrid_mode: True to enable hybrid (sparse + dense) search and False to only enable dense search.
     - analyzer_params: parameters for the Milvus BM25 analyzer.
     - fusion_type: the algorithm for combining the dense and the sparse scores if hybrid mode is activated. Milvus only
@@ -63,8 +65,8 @@ class ToolRagAlgorithm(BaseRetrievalAlgorithm):
     - min_sub_tasks: the minimum number of tasks to decompose the original query into.
     - max_sub_tasks: the maximum number of tasks to decompose the original query into.
     - query_rewrite_tool_suggestions_num: the maximal number of tool APIs to produce from the original query during rewriting.
-    - recursion_limit: Maximum iterations for LangGraph agent (default: 6).
-    - max_iterations: Maximum iterations for agent execution (default: 25).
+    - recursion_limit: Maximum iterations for LangGraph agent (default: 10).
+    - max_iterations: Maximum iterations for agent execution (default: 6).
     """
 
     query_rewriting_model: BaseChatModel or None
