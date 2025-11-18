@@ -39,8 +39,8 @@ class Evaluator(object):
         except ConfigError as ce:
             log(f"Configuration error: {ce}")
             raise SystemExit(2)
-    async def run(self) -> None:
 
+    async def run(self) -> None:
         # Set up the necessary components for the experiments:
         # - the language model
         # - the data to evaluate on
@@ -206,9 +206,9 @@ class Evaluator(object):
         log("Retrieving tool definitions for the current experiment...")
         model_config = self.config.models
         model_id = self.config.data.additional_examples_model_id
-        tool_specs = get_tools_from_queries(queries,self.config.data.generate_examples,model_id,model_config)
+        tool_specs = get_tools_from_queries(queries, self.config.data.generate_examples, model_id, model_config)
         tools = await mcp_proxy_manager.run_mcp_proxy(tool_specs, init_client=True).get_tools()
-        tools = await self.augment_tools_with_examples(tools)
+        tools = self.augment_tools_with_examples(tools)
         print_iterable_verbose("The following tools will be available during evaluation:\n", tools)
         log(f"The experiment will proceed with {len(tools)} tool(s).\n")
 
@@ -220,15 +220,12 @@ class Evaluator(object):
 
         return queries
     
-    def augment_tools_with_examples(self, tools: List[BaseTool]) -> List[Any]:
-
-        try:
-            for t in tools or []:
-                t.metadata = {}
-                name = getattr(t, "name", "")
-                aq = get_examples_by_tool_name(name)
-                if isinstance(aq, dict):
-                    t.metadata["examples"] = aq
-        except Exception as e:
-            log(f"Error augmenting tools with examples: {e}")
+    @staticmethod
+    def augment_tools_with_examples(tools: List[BaseTool]) -> List[Any]:
+        for t in tools or []:
+            t.metadata = {}
+            name = getattr(t, "name", "")
+            aq = get_examples_by_tool_name(name)
+            if isinstance(aq, dict):
+                t.metadata["examples"] = aq
         return tools
