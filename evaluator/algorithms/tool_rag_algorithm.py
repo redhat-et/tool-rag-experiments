@@ -24,7 +24,6 @@ load_dotenv()
 
 MILVUS_CONNECTION_ALIAS = "tools_connection"
 DEFAULT_RECURSION_LIMIT = 10  # Tool RAG needs fewer iterations since tools are available upfront
-DEFAULT_MAX_ITERATIONS = 6  # Maximum iterations for agent execution
 
 @register_algorithm("tool_rag")
 class ToolRagAlgorithm(BaseRetrievalAlgorithm):
@@ -66,7 +65,6 @@ class ToolRagAlgorithm(BaseRetrievalAlgorithm):
     - max_sub_tasks: the maximum number of tasks to decompose the original query into.
     - query_rewrite_tool_suggestions_num: the maximal number of tool APIs to produce from the original query during rewriting.
     - recursion_limit: Maximum iterations for LangGraph agent (default: 10).
-    - max_iterations: Maximum iterations for agent execution (default: 6).
     """
 
     query_rewriting_model: BaseChatModel or None
@@ -84,7 +82,6 @@ class ToolRagAlgorithm(BaseRetrievalAlgorithm):
             "collection_name": "tools_collection",
             "drop_old_collection": True,
             "recursion_limit": DEFAULT_RECURSION_LIMIT,
-            "max_iterations": DEFAULT_MAX_ITERATIONS,
             
             # Query rewriting / decomposition
             "enable_query_decomposition": False,
@@ -277,7 +274,6 @@ class ToolRagAlgorithm(BaseRetrievalAlgorithm):
             query_spec.query,
             config={
                 "recursion_limit": self._settings.get("recursion_limit", DEFAULT_RECURSION_LIMIT),
-                "max_iterations": self._settings.get("max_iterations", DEFAULT_MAX_ITERATIONS)
             }
         ), relevant_tool_names
 

@@ -20,7 +20,6 @@ DEFAULT_MAX_RESULT_CHARS = 4000
 DEFAULT_DROP_OLD_COLLECTION = True
 DEFAULT_COLLECTION_NAME = "tool_fetcher_tools_collection"
 DEFAULT_RECURSION_LIMIT = 10  # Tool Fetcher needs more iterations due to search-then-call pattern
-DEFAULT_MAX_ITERATIONS = 8  # Maximum iterations for agent execution
 
 # Substring search fallback weights
 MIN_K = 1
@@ -107,7 +106,6 @@ class ToolFetcherAlgorithm(BaseRetrievalAlgorithm):
     - collection_name: Milvus collection name (default: "tool_fetcher_tools_collection")
     - drop_old_collection: Drop existing collection on startup (default: True)
     - recursion_limit: Maximum iterations for LangGraph agent (default: 10)
-    - max_iterations: Maximum iterations for agent execution (default: 25)
 
     Inherits retrieval settings from BaseRetrievalAlgorithm:
     - Embedding configuration: embedding_model_id, similarity_metric
@@ -130,7 +128,6 @@ class ToolFetcherAlgorithm(BaseRetrievalAlgorithm):
             "collection_name": DEFAULT_COLLECTION_NAME,
             "max_result_chars": DEFAULT_MAX_RESULT_CHARS,
             "recursion_limit": DEFAULT_RECURSION_LIMIT,
-            "max_iterations": DEFAULT_MAX_ITERATIONS,
         })
         return base_settings
 
@@ -465,14 +462,13 @@ class ToolFetcherAlgorithm(BaseRetrievalAlgorithm):
         agent = create_react_agent(
             self._model,
             [hub],
-            state_modifier=AGENT_SYSTEM_PROMPT
+            prompt=AGENT_SYSTEM_PROMPT
         )
         result = await self._invoke_agent_on_query(
             agent,
             query_spec.query,
             config={
                 "recursion_limit": self._settings.get("recursion_limit", DEFAULT_RECURSION_LIMIT),
-                "max_iterations": self._settings.get("max_iterations", DEFAULT_MAX_ITERATIONS)
             }
         )
 
