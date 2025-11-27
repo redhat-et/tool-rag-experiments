@@ -125,6 +125,9 @@ class Evaluator(object):
                     response = None
                     retrieved_tools = None
                     for attempt in range(1, MAX_RETRIES + 1):
+                        # Clear tool log before EACH attempt to prevent accumulation across retries
+                        ToolLogger(os.getenv("TOOL_LOG_PATH")).clear_log()
+                        
                         try:
                             response, retrieved_tools = await asyncio.wait_for(
                                 algorithm.process_query(query_spec),
